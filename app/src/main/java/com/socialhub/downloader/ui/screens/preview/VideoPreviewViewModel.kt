@@ -63,29 +63,79 @@ class VideoPreviewViewModel @Inject constructor() : ViewModel() {
                 else -> SocialPlatform.INSTAGRAM
             }
 
-            _videoDetails.value = VideoDetails(
-                title = when (platform) {
-                    SocialPlatform.YOUTUBE -> "How to build UI with Jetpack Compose (Kotlin Tutorial)"
-                    SocialPlatform.INSTAGRAM -> "Beautiful morning views in Norway Fjords 🌲"
-                    SocialPlatform.TIKTOK -> "Ultimate dance compilation trend 2026"
-                    else -> "Interesting social media post highlight"
-                },
-                platform = platform,
-                duration = when (platform) {
-                    SocialPlatform.YOUTUBE -> "12:45"
-                    else -> "0:30"
-                },
-                creatorName = when (platform) {
-                    SocialPlatform.YOUTUBE -> "ComposeAcademy"
-                    SocialPlatform.INSTAGRAM -> "norway_traveler"
-                    else -> "viral_trends"
-                },
-                creatorAvatarUrl = "",
-                views = "245K views",
-                likes = "18K likes"
-            )
+            _videoDetails.value = extractDetailsFromUrl(url, platform)
             _isLoading.value = false
         }
+    }
+
+    private fun extractDetailsFromUrl(url: String, platform: SocialPlatform): VideoDetails {
+        var title = ""
+        var creator = ""
+        
+        try {
+            val uri = android.net.Uri.parse(url)
+            val path = uri.path ?: ""
+            val host = uri.host ?: ""
+            
+            if (platform == SocialPlatform.YOUTUBE) {
+                val vParam = uri.getQueryParameter("v")
+                if (!vParam.isNullOrEmpty()) {
+                    title = vParam.replace("-", " ").replace("_", " ")
+                } else {
+                    val segments = uri.pathSegments
+                    if (segments.isNotEmpty()) {
+                        title = segments.last().replace("-", " ").replace("_", " ")
+                    }
+                }
+                creator = "YouTube Creator"
+            } else {
+                val segments = uri.pathSegments
+                if (segments.size >= 2) {
+                    title = segments[segments.size - 2].replace("-", " ").replace("_", " ") + 
+                            " (" + segments.last().take(6) + ")"
+                } else if (segments.isNotEmpty()) {
+                    title = segments.last().replace("-", " ").replace("_", " ")
+                }
+                
+                creator = host.replace("www.", "").substringBefore(".")
+            }
+        } catch (e: Exception) {
+            // fallback handled below
+        }
+
+        // Validate and apply default fallback if parsed name is too short/generic
+        if (title.trim().length < 4 || title.all { it.isDigit() || !it.isLetter() }) {
+            title = when (platform) {
+                SocialPlatform.YOUTUBE -> "How to build UI with Jetpack Compose (Kotlin Tutorial)"
+                SocialPlatform.INSTAGRAM -> "Beautiful morning views in Norway Fjords 🌲"
+                SocialPlatform.TIKTOK -> "Ultimate dance compilation trend 2026"
+                else -> "Interesting social media post highlight"
+            }
+        } else {
+            // Clean double spaces and titlecase
+            title = title.split(" ")
+                .filter { it.isNotEmpty() }
+                .joinToString(" ") { word ->
+                    word.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
+                }
+        }
+
+        if (creator.isEmpty() || creator.length < 3) {
+            creator = "social_hub_creator"
+        }
+
+        return VideoDetails(
+            title = title,
+            platform = platform,
+            duration = when (platform) {
+                SocialPlatform.YOUTUBE -> "12:45"
+                else -> "0:45"
+            },
+            creatorName = creator,
+            creatorAvatarUrl = "",
+            views = "${(100..990).random()}K views",
+            likes = "${(10..98).random()}K likes"
+        )
     }
 
     fun selectQuality(quality: SelectedQuality) {
