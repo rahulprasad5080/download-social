@@ -203,29 +203,44 @@ fun HomeScreen(
                                 enter = fadeIn(),
                                 exit = fadeOut()
                             ) {
-                                detectedPlatform?.let { platform ->
-                                    Row(
-                                        modifier = Modifier
-                                            .padding(top = 12.dp)
-                                            .fillMaxWidth()
-                                            .clip(RoundedCornerShape(8.dp))
-                                            .background(platform.primaryColor.copy(alpha = 0.2f))
-                                            .padding(horizontal = 12.dp, vertical = 8.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Box(
+                                Column(modifier = Modifier.padding(top = 12.dp)) {
+                                    detectedPlatform?.let { platform ->
+                                        Row(
                                             modifier = Modifier
-                                                .size(8.dp)
-                                                .clip(CircleShape)
-                                                .background(platform.primaryColor)
-                                        )
+                                                .fillMaxWidth()
+                                                .clip(RoundedCornerShape(8.dp))
+                                                .background(platform.primaryColor.copy(alpha = 0.2f))
+                                                .padding(horizontal = 12.dp, vertical = 8.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(8.dp)
+                                                    .clip(CircleShape)
+                                                    .background(platform.primaryColor)
+                                            )
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Text(
+                                                text = "Auto-detected: ${platform.displayName}",
+                                                color = Color.White,
+                                                fontSize = 12.sp,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        }
+                                    }
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                    Button(
+                                        onClick = {
+                                            navController.navigate(Screen.VideoPreview.createRoute(urlInput))
+                                        },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        colors = ButtonDefaults.buttonColors(containerColor = ElectricPurple),
+                                        shape = RoundedCornerShape(12.dp),
+                                        contentPadding = PaddingValues(vertical = 12.dp)
+                                    ) {
+                                        Icon(imageVector = Icons.Default.Download, contentDescription = null, tint = Color.White)
                                         Spacer(modifier = Modifier.width(8.dp))
-                                        Text(
-                                            text = "Auto-detected: ${platform.displayName}",
-                                            color = Color.White,
-                                            fontSize = 12.sp,
-                                            fontWeight = FontWeight.Bold
-                                        )
+                                        Text(text = "Resolve Link", color = Color.White, fontWeight = FontWeight.Bold)
                                     }
                                 }
                             }
