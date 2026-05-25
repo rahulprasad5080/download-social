@@ -106,26 +106,26 @@ fun AnimatedDownloadButton(
                         Icon(
                             imageVector = Icons.Default.Download,
                             contentDescription = "Download Icon",
-                            tint = Color.white
+                            tint = Color.White
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             text = "Download in High Quality",
-                            color = Color.white,
+                            color = Color.White,
                             fontSize = 16.sp,
                             style = MaterialTheme.typography.titleMedium
                         )
                     }
                     DownloadButtonState.PREPARING -> {
                         CircularProgressIndicator(
-                            color = Color.white,
+                            color = Color.White,
                             modifier = Modifier.size(24.dp),
                             strokeWidth = 2.dp
                         )
                         Spacer(modifier = Modifier.width(12.dp))
                         Text(
                             text = "Resolving link...",
-                            color = Color.white,
+                            color = Color.White,
                             fontSize = 16.sp,
                             style = MaterialTheme.typography.titleMedium
                         )
@@ -133,14 +133,14 @@ fun AnimatedDownloadButton(
                     DownloadButtonState.DOWNLOADING -> {
                         CircularProgressIndicator(
                             progress = progress,
-                            color = Color.white,
+                            color = Color.White,
                             modifier = Modifier.size(24.dp),
                             strokeWidth = 2.5.dp
                         )
                         Spacer(modifier = Modifier.width(12.dp))
                         Text(
                             text = "Downloading... ${(progress * 100).toInt()}%",
-                            color = Color.white,
+                            color = Color.White,
                             fontSize = 16.sp,
                             style = MaterialTheme.typography.titleMedium
                         )
@@ -149,13 +149,13 @@ fun AnimatedDownloadButton(
                         Icon(
                             imageVector = Icons.Default.Check,
                             contentDescription = "Success check",
-                            tint = Color.white,
+                            tint = Color.White,
                             modifier = Modifier.size(28.dp)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             text = "Saved to Gallery",
-                            color = Color.white,
+                            color = Color.White,
                             fontSize = 16.sp,
                             style = MaterialTheme.typography.titleMedium
                         )

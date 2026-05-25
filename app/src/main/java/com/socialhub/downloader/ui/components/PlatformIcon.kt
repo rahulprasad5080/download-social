@@ -101,7 +101,7 @@ fun PlatformIcon(
         Icon(
             imageVector = platform.icon,
             contentDescription = platform.displayName,
-            tint = Color.white,
+            tint = Color.White,
             modifier = Modifier.size(size * 0.5f)
         )
     }

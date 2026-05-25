@@ -171,7 +171,7 @@ fun LibraryScreen(
                 // Render Folders Grid
                 LazyVerticalGrid(
                     columns = GridCells.Fixed(2),
-                    contentPadding = PaddingValues(horizontal = 16.dp, bottom = 16.dp),
+                    contentPadding = PaddingValues(start = 16.dp, top = 0.dp, end = 16.dp, bottom = 16.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
@@ -235,7 +235,7 @@ fun LibraryScreen(
                 } else {
                     LazyColumn(
                         modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(horizontal = 16.dp, bottom = 16.dp),
+                        contentPadding = PaddingValues(start = 16.dp, top = 0.dp, end = 16.dp, bottom = 16.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         items(filteredItems, key = { it.id }) { item ->

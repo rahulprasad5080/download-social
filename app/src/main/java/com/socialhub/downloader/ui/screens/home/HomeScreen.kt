@@ -86,7 +86,7 @@ fun HomeScreen(
     ) {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(bottom = 80.dp)
+            contentPadding = PaddingValues(start = 0.dp, top = 0.dp, end = 0.dp, bottom = 80.dp)
         ) {
             // Header Search Bar
             item {
@@ -162,7 +162,8 @@ fun HomeScreen(
                                 colors = TextFieldDefaults.outlinedTextFieldColors(
                                     focusedBorderColor = ElectricPurple,
                                     unfocusedBorderColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f),
-                                    textColor = Color.White
+                                    focusedTextColor = Color.White,
+                                    unfocusedTextColor = Color.White
                                 ),
                                 trailingIcon = {
                                     if (urlInput.isNotEmpty()) {
@@ -241,7 +242,7 @@ fun HomeScreen(
                     Text(
                         text = "Quick Platform Input",
                         style = MaterialTheme.typography.titleMedium.copy(color = Color.White),
-                        modifier = Modifier.padding(horizontal = 16.dp, bottom = 8.dp)
+                        modifier = Modifier.padding(start = 16.dp, top = 0.dp, end = 16.dp, bottom = 8.dp)
                     )
                     LazyRow(
                         contentPadding = PaddingValues(horizontal = 16.dp),
@@ -278,7 +279,7 @@ fun HomeScreen(
                     Text(
                         text = "Trending Downloads",
                         style = MaterialTheme.typography.titleMedium.copy(color = Color.White),
-                        modifier = Modifier.padding(horizontal = 16.dp, bottom = 8.dp)
+                        modifier = Modifier.padding(start = 16.dp, top = 0.dp, end = 16.dp, bottom = 8.dp)
                     )
 
                     if (isLoading) {
@@ -379,7 +380,7 @@ fun HomeScreen(
                     Text(
                         text = "Recent Downloads",
                         style = MaterialTheme.typography.titleMedium.copy(color = Color.White),
-                        modifier = Modifier.padding(horizontal = 16.dp, bottom = 8.dp)
+                        modifier = Modifier.padding(start = 16.dp, top = 0.dp, end = 16.dp, bottom = 8.dp)
                     )
 
                     if (isLoading) {

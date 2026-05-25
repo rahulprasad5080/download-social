@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -22,7 +23,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.CleaningServices
-import androidx.compose.material.icons.filled.DarkTheme
+import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.FolderSpecial
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Person
@@ -85,7 +86,7 @@ fun ProfileScreen(
                 .fillMaxSize()
                 .background(MaterialTheme.colorScheme.background)
                 .padding(paddingValues),
-            contentPadding = PaddingValues(horizontal = 16.dp, bottom = 32.dp)
+            contentPadding = PaddingValues(start = 16.dp, top = 0.dp, end = 16.dp, bottom = 32.dp)
         ) {
             // Profile Header
             item {
@@ -299,7 +300,7 @@ fun ProfileScreen(
                     color = Color.White,
                     fontWeight = FontWeight.Bold,
                     fontSize = 14.sp,
-                    modifier = Modifier.padding(bottom = 8.dp)
+                    modifier = Modifier.padding(start = 0.dp, top = 0.dp, end = 0.dp, bottom = 8.dp)
                 )
 
                 Column(
@@ -316,7 +317,7 @@ fun ProfileScreen(
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(imageVector = Icons.Default.DarkTheme, contentDescription = null, tint = ElectricPurple, modifier = Modifier.size(20.dp))
+                                Icon(imageVector = Icons.Default.DarkMode, contentDescription = null, tint = ElectricPurple, modifier = Modifier.size(20.dp))
                                 Spacer(modifier = Modifier.width(12.dp))
                                 Text(text = "Dark Theme", color = Color.White, fontSize = 14.sp)
                             }
