@@ -21,6 +21,7 @@ sealed class Screen(val route: String, val title: String = "", val icon: ImageVe
     object Profile : Screen("profile", "Settings", Icons.Default.Person)
 
     companion object {
-        val bottomNavItems = listOf(Home, DownloadManager, Library, Profile)
+        val bottomNavItems: List<Screen>
+            get() = listOf(Home, DownloadManager, Library, Profile)
     }
 }

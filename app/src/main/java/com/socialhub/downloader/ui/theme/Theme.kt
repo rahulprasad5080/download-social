@@ -12,6 +12,8 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 
+import android.content.ContextWrapper
+
 private val DarkColorScheme = darkColorScheme(
     primary = ElectricPurple,
     secondary = CyberCyan,
@@ -50,14 +52,24 @@ fun SocialHubTheme(
     
     if (!view.isInEditMode) {
         SideEffect {
-            val window = (view.context as Activity).window
-            window.statusBarColor = colorScheme.background.toArgb()
-            window.navigationBarColor = colorScheme.background.toArgb()
+            var context = view.context
+            while (context is ContextWrapper) {
+                if (context is Activity) {
+                    break
+                }
+                context = context.baseContext
+            }
             
-            // Set status/navigation bar icons color based on theme
-            WindowCompat.getInsetsController(window, view).apply {
-                isAppearanceLightStatusBars = !darkTheme
-                isAppearanceLightNavigationBars = !darkTheme
+            val activity = context as? Activity
+            if (activity != null) {
+                val window = activity.window
+                window.statusBarColor = colorScheme.background.toArgb()
+                window.navigationBarColor = colorScheme.background.toArgb()
+                
+                WindowCompat.getInsetsController(window, view).apply {
+                    isAppearanceLightStatusBars = !darkTheme
+                    isAppearanceLightNavigationBars = !darkTheme
+                }
             }
         }
     }

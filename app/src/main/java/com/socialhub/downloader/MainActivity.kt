@@ -7,13 +7,21 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
@@ -115,7 +123,7 @@ fun MainAppShell(
         Surface(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(bottom = if (isBottomBarVisible) 64.dp else 0.dp), // handle navigation bar padding manually
+                .padding(bottom = if (isBottomBarVisible) 92.dp else 0.dp), // handle navigation bar padding manually
             color = MaterialTheme.colorScheme.background
         ) {
             NavGraph(navController = navController)
@@ -132,43 +140,45 @@ fun GlassmorphicBottomBar(
         modifier = Modifier
             .fillMaxWidth()
             .navigationBarsPadding()
-            .padding(horizontal = 24.dp, vertical = 8.dp)
+            .padding(start = 24.dp, end = 24.dp, bottom = 12.dp)
     ) {
         GlassCard(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(64.dp),
+                .height(72.dp),
             cornerRadius = 24.dp
         ) {
-            NavigationBar(
-                containerColor = Color.Transparent,
-                tonalElevation = 0.dp,
-                modifier = Modifier.fillMaxSize()
+            Row(
+                modifier = Modifier.fillMaxSize(),
+                horizontalArrangement = Arrangement.SpaceAround,
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 Screen.bottomNavItems.forEach { screen ->
                     val isSelected = currentRoute == screen.route
                     
-                    NavigationBarItem(
-                        selected = isSelected,
-                        onClick = { onNavigate(screen.route) },
-                        icon = {
-                            Icon(
-                                imageVector = screen.icon!!,
-                                contentDescription = screen.title,
-                                tint = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-                            )
-                        },
-                        label = {
-                            Text(
-                                text = screen.title,
-                                color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                                fontSize = 10.sp
-                            )
-                        },
-                        colors = NavigationBarItemDefaults.colors(
-                            indicatorColor = ElectricPurple.copy(alpha = 0.4f)
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(16.dp))
+                            .clickable { onNavigate(screen.route) }
+                            .padding(vertical = 8.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Icon(
+                            imageVector = screen.icon!!,
+                            contentDescription = screen.title,
+                            tint = if (isSelected) ElectricPurple else Color.Gray.copy(alpha = 0.8f),
+                            modifier = Modifier.size(24.dp)
                         )
-                    )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = screen.title,
+                            color = if (isSelected) Color.White else Color.Gray.copy(alpha = 0.8f),
+                            fontSize = 11.sp,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                        )
+                    }
                 }
             }
         }
