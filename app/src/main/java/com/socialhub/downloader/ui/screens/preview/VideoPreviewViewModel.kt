@@ -1,9 +1,13 @@
 package com.socialhub.downloader.ui.screens.preview
 
 import android.content.Context
+import android.net.Uri
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.socialhub.downloader.data.remote.DownloadOption
+import com.socialhub.downloader.data.remote.ResolvedMedia
+import com.socialhub.downloader.data.remote.SocialMediaRepository
 import com.socialhub.downloader.download.DownloadService
 import com.socialhub.downloader.ui.components.DownloadButtonState
 import com.socialhub.downloader.ui.components.SocialPlatform
@@ -21,13 +25,6 @@ import java.net.HttpURLConnection
 import java.net.URL
 import javax.inject.Inject
 
-enum class SelectedQuality(val label: String, val size: String, val extension: String) {
-    MP4_1080P("MP4 1080p (FHD)", "84.5 MB", ".mp4"),
-    MP4_720P("MP4 720p (HD)", "42.1 MB", ".mp4"),
-    MP4_360P("MP4 360p (SD)", "18.3 MB", ".mp4"),
-    MP3_AUDIO("Audio MP3 (320kbps)", "6.8 MB", ".mp3")
-}
-
 data class VideoDetails(
     val sourceUrl: String,
     val title: String,
@@ -37,12 +34,14 @@ data class VideoDetails(
     val creatorAvatarUrl: String,
     val thumbnailUrl: String,
     val views: String,
-    val likes: String
+    val likes: String,
+    val downloadOptions: List<DownloadOption>
 )
 
 @HiltViewModel
 class VideoPreviewViewModel @Inject constructor(
-    @ApplicationContext private val context: Context
+    @ApplicationContext private val context: Context,
+    private val socialMediaRepository: SocialMediaRepository
 ) : ViewModel() {
 
     private val _isLoading = MutableStateFlow(true)
@@ -51,8 +50,8 @@ class VideoPreviewViewModel @Inject constructor(
     private val _videoDetails = MutableStateFlow<VideoDetails?>(null)
     val videoDetails: StateFlow<VideoDetails?> = _videoDetails.asStateFlow()
 
-    private val _selectedQuality = MutableStateFlow(SelectedQuality.MP4_1080P)
-    val selectedQuality: StateFlow<SelectedQuality> = _selectedQuality.asStateFlow()
+    private val _selectedOption = MutableStateFlow<DownloadOption?>(null)
+    val selectedOption: StateFlow<DownloadOption?> = _selectedOption.asStateFlow()
 
     private val _downloadState = MutableStateFlow(DownloadButtonState.IDLE)
     val downloadState: StateFlow<DownloadButtonState> = _downloadState.asStateFlow()
@@ -66,95 +65,123 @@ class VideoPreviewViewModel @Inject constructor(
     fun loadVideoDetails(url: String) {
         viewModelScope.launch {
             _isLoading.value = true
-            delay(300)
-            
-            val cleanUrl = url.lowercase()
-            val platform = when {
-                cleanUrl.contains("youtube.com") || cleanUrl.contains("youtu.be") -> SocialPlatform.YOUTUBE
-                cleanUrl.contains("tiktok.com") -> SocialPlatform.TIKTOK
-                cleanUrl.contains("facebook.com") -> SocialPlatform.FACEBOOK
-                cleanUrl.contains("twitter.com") || cleanUrl.contains("x.com") -> SocialPlatform.X
-                cleanUrl.contains("pinterest.com") -> SocialPlatform.PINTEREST
-                cleanUrl.contains("threads.net") -> SocialPlatform.THREADS
-                else -> SocialPlatform.INSTAGRAM
-            }
+            _downloadMessage.value = null
 
-            _videoDetails.value = extractDetailsFromUrl(url, platform)
+            val platform = detectPlatform(url)
+            val resolved = socialMediaRepository.resolve(url)
+            val details = resolved.fold(
+                onSuccess = { media -> media.toVideoDetails(url, platform) },
+                onFailure = { error ->
+                    _downloadMessage.value = error.message ?: "Unable to resolve this link"
+                    createFallbackDetails(url, platform)
+                }
+            )
+
+            _videoDetails.value = details
+            _selectedOption.value = details.downloadOptions.firstOrNull()
             _isLoading.value = false
         }
     }
 
-    private suspend fun extractDetailsFromUrl(url: String, platform: SocialPlatform): VideoDetails {
-        var title = ""
-        var creator = ""
-        var thumbnailUrl = ""
-        
-        try {
-            val uri = android.net.Uri.parse(url)
-            val host = uri.host ?: ""
-            
-            if (platform == SocialPlatform.YOUTUBE) {
-                val videoId = extractYoutubeVideoId(uri)
-                if (!videoId.isNullOrBlank()) {
-                    thumbnailUrl = "https://img.youtube.com/vi/$videoId/hqdefault.jpg"
-                    title = fetchYoutubeTitle(url).ifBlank {
-                        "YouTube video $videoId"
-                    }
-                } else {
-                    val segments = uri.pathSegments
-                    if (segments.isNotEmpty()) {
-                        title = segments.last().replace("-", " ").replace("_", " ")
-                    }
-                }
-                creator = "YouTube Creator"
-            } else {
-                val segments = uri.pathSegments
-                if (segments.size >= 2) {
-                    title = segments[segments.size - 2].replace("-", " ").replace("_", " ") + 
-                            " (" + segments.last().take(6) + ")"
-                } else if (segments.isNotEmpty()) {
-                    title = segments.last().replace("-", " ").replace("_", " ")
-                }
-                
-                creator = host.replace("www.", "").substringBefore(".")
-            }
-        } catch (e: Exception) {
-            // fallback handled below
-        }
+    private fun ResolvedMedia.toVideoDetails(inputUrl: String, fallbackPlatform: SocialPlatform): VideoDetails {
+        val platform = detectPlatform(source.ifBlank { pageUrl.ifBlank { inputUrl } })
+        return VideoDetails(
+            sourceUrl = pageUrl.ifBlank { inputUrl },
+            title = title,
+            platform = platform,
+            duration = duration,
+            creatorName = source.ifBlank { platform.displayName }.sanitizeCreatorName(),
+            creatorAvatarUrl = "",
+            thumbnailUrl = thumbnailUrl,
+            views = "${options.size} media option${if (options.size == 1) "" else "s"}",
+            likes = if (source.isBlank()) fallbackPlatform.displayName else source,
+            downloadOptions = options
+        )
+    }
 
-        // Validate and apply default fallback if parsed name is too short/generic
-        if (title.trim().length < 4 || title.all { it.isDigit() || !it.isLetter() }) {
-            title = "${platform.displayName} media from ${creator.ifBlank { "shared link" }}"
+    private suspend fun createFallbackDetails(url: String, platform: SocialPlatform): VideoDetails {
+        val uri = runCatching { Uri.parse(url) }.getOrNull()
+        val host = uri?.host.orEmpty()
+        val title = inferTitle(url, platform, uri)
+        val thumbnailUrl = if (platform == SocialPlatform.YOUTUBE) {
+            extractYoutubeVideoId(uri)?.let { videoId ->
+                "https://img.youtube.com/vi/$videoId/hqdefault.jpg"
+            }.orEmpty()
         } else {
-            // Clean double spaces and titlecase
-            title = title.split(" ")
-                .filter { it.isNotEmpty() }
-                .joinToString(" ") { word ->
-                    word.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
-                }
+            ""
         }
-
-        if (creator.isEmpty() || creator.length < 3) {
-            creator = "social_hub_creator"
-        }
+        val directOption = if (isDirectDownloadUrl(url)) listOf(createDirectDownloadOption(url)) else emptyList()
 
         return VideoDetails(
             sourceUrl = url,
             title = title,
             platform = platform,
-            duration = when (platform) {
-                SocialPlatform.YOUTUBE -> "12:45"
-                else -> "0:45"
-            },
-            creatorName = creator,
+            duration = if (platform == SocialPlatform.YOUTUBE) "12:45" else "--:--",
+            creatorName = host.replace("www.", "").substringBefore(".").sanitizeCreatorName(),
             creatorAvatarUrl = "",
             thumbnailUrl = thumbnailUrl,
-            views = "${url.length.coerceAtLeast(1)} chars",
-            likes = platform.displayName
+            views = if (directOption.isEmpty()) "Needs API resolver" else "Direct media link",
+            likes = platform.displayName,
+            downloadOptions = directOption
         )
     }
 
-    private fun extractYoutubeVideoId(uri: android.net.Uri): String? {
+    private suspend fun inferTitle(url: String, platform: SocialPlatform, uri: Uri?): String {
+        if (platform == SocialPlatform.YOUTUBE) {
+            fetchYoutubeTitle(url).takeIf { it.isNotBlank() }?.let { return it }
+        }
+
+        val segments = uri?.pathSegments.orEmpty()
+        val rawTitle = when {
+            segments.size >= 2 -> "${segments[segments.size - 2]} ${segments.last().take(8)}"
+            segments.isNotEmpty() -> segments.last()
+            else -> "${platform.displayName} media"
+        }
+
+        return rawTitle
+            .replace("-", " ")
+            .replace("_", " ")
+            .split(" ")
+            .filter { it.isNotBlank() }
+            .joinToString(" ") { word ->
+                word.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
+            }
+            .ifBlank { "${platform.displayName} media" }
+    }
+
+    private fun createDirectDownloadOption(url: String): DownloadOption {
+        val extension = url.substringBefore("?")
+            .substringAfterLast(".", "mp4")
+            .lowercase()
+            .takeIf { it.length in 2..5 }
+            ?: "mp4"
+        val hasVideo = extension !in audioExtensions
+
+        return DownloadOption(
+            label = if (hasVideo) "Direct Video (${extension.uppercase()})" else "Direct Audio (${extension.uppercase()})",
+            sizeLabel = "Unknown size",
+            extension = ".$extension",
+            downloadUrl = url,
+            hasVideo = hasVideo,
+            hasAudio = true
+        )
+    }
+
+    private fun detectPlatform(url: String): SocialPlatform {
+        val cleanUrl = url.lowercase()
+        return when {
+            cleanUrl.contains("youtube.com") || cleanUrl.contains("youtu.be") -> SocialPlatform.YOUTUBE
+            cleanUrl.contains("tiktok.com") -> SocialPlatform.TIKTOK
+            cleanUrl.contains("facebook.com") || cleanUrl.contains("fb.watch") -> SocialPlatform.FACEBOOK
+            cleanUrl.contains("twitter.com") || cleanUrl.contains("x.com") -> SocialPlatform.X
+            cleanUrl.contains("pinterest.com") -> SocialPlatform.PINTEREST
+            cleanUrl.contains("threads.net") -> SocialPlatform.THREADS
+            else -> SocialPlatform.INSTAGRAM
+        }
+    }
+
+    private fun extractYoutubeVideoId(uri: Uri?): String? {
+        if (uri == null) return null
         uri.getQueryParameter("v")?.takeIf { it.isNotBlank() }?.let { return it }
 
         val host = uri.host.orEmpty()
@@ -177,64 +204,53 @@ class VideoPreviewViewModel @Inject constructor(
         }.getOrDefault("")
     }
 
-    fun selectQuality(quality: SelectedQuality) {
-        _selectedQuality.value = quality
+    fun selectOption(option: DownloadOption) {
+        _selectedOption.value = option
     }
 
     fun clearDownloadMessage() {
         _downloadMessage.value = null
     }
 
-    fun startDownload(onDownloadCompleted: (String, SelectedQuality) -> Unit) {
+    fun startDownload(onDownloadCompleted: (String, DownloadOption) -> Unit) {
         viewModelScope.launch {
-            // 1. User ne jo URL paste kiya tha, woh details.sourceUrl mein available hai.
             val details = _videoDetails.value ?: return@launch
+            val option = _selectedOption.value
             _downloadMessage.value = null
 
-            // 2. App pehle HEAD/content-type se check karta hai ki link direct video/audio file hai ya nahi.
-            if (!isDirectDownloadUrl(details.sourceUrl)) {
+            if (option == null) {
                 _downloadState.value = DownloadButtonState.ERROR
-                _downloadMessage.value = "This link is a web page. Use a direct video/audio file link."
+                _downloadMessage.value = "No downloadable media found. Check API configuration."
                 delay(1600)
                 _downloadState.value = DownloadButtonState.IDLE
                 return@launch
             }
 
-            // 3. Direct media URL milne par foreground DownloadService start hoti hai.
             ContextCompat.startForegroundService(
                 context,
                 DownloadService.createIntent(
                     context = context,
-                    url = details.sourceUrl,
+                    url = option.downloadUrl,
                     title = details.title,
                     platform = details.platform,
-                    sizeLabel = _selectedQuality.value.size,
+                    sizeLabel = option.sizeLabel,
                     duration = details.duration,
-                    extension = _selectedQuality.value.extension
+                    extension = option.extension
                 )
             )
             _downloadState.value = DownloadButtonState.COMPLETED
             _downloadMessage.value = "Download started"
             delay(1000)
             _downloadState.value = DownloadButtonState.IDLE
-            onDownloadCompleted(details.title, _selectedQuality.value)
+            onDownloadCompleted(details.title, option)
         }
     }
 
     private suspend fun isDirectDownloadUrl(url: String): Boolean = withContext(Dispatchers.IO) {
-        val lowerUrl = url.substringBefore('?').lowercase()
-        if (lowerUrl.endsWith(".mp4") ||
-            lowerUrl.endsWith(".mp3") ||
-            lowerUrl.endsWith(".m4a") ||
-            lowerUrl.endsWith(".webm") ||
-            lowerUrl.endsWith(".mov")
-        ) {
-            return@withContext true
-        }
+        val lowerUrl = url.substringBefore("?").lowercase()
+        if (mediaExtensions.any { lowerUrl.endsWith(".$it") }) return@withContext true
 
         runCatching {
-            // Same idea as: val connection = URL(inputUrl).openConnection() as HttpURLConnection
-            // Then requestMethod = "HEAD" and contentType startsWith("video/") or "audio/".
             val connection = (URL(url).openConnection() as HttpURLConnection).apply {
                 requestMethod = "HEAD"
                 instanceFollowRedirects = true
@@ -249,5 +265,17 @@ class VideoPreviewViewModel @Inject constructor(
                 contentType.startsWith("audio/") ||
                 contentType == "application/octet-stream"
         }.getOrDefault(false)
+    }
+
+    private fun String.sanitizeCreatorName(): String {
+        return trim()
+            .replace(" ", "_")
+            .replace(Regex("[^A-Za-z0-9._-]"), "")
+            .ifBlank { "social_hub" }
+    }
+
+    private companion object {
+        val audioExtensions = setOf("mp3", "m4a", "aac", "wav", "ogg")
+        val mediaExtensions = audioExtensions + setOf("mp4", "webm", "mov", "mkv")
     }
 }

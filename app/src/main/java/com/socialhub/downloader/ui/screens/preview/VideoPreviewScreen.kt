@@ -21,11 +21,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Audiotrack
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.RadioButtonChecked
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -70,7 +72,7 @@ fun VideoPreviewScreen(
     val context = LocalContext.current
     val isLoading by viewModel.isLoading.collectAsState()
     val videoDetails by viewModel.videoDetails.collectAsState()
-    val selectedQuality by viewModel.selectedQuality.collectAsState()
+    val selectedOption by viewModel.selectedOption.collectAsState()
     val downloadState by viewModel.downloadState.collectAsState()
     val downloadProgress by viewModel.downloadProgress.collectAsState()
     val downloadMessage by viewModel.downloadMessage.collectAsState()
@@ -297,7 +299,7 @@ fun VideoPreviewScreen(
 
                         // Quality selector section
                         Text(
-                            text = "Select Download Quality",
+                            text = "Select Download Option",
                             color = Color.LightGray,
                             fontWeight = FontWeight.Bold,
                             fontSize = 14.sp,
@@ -308,12 +310,22 @@ fun VideoPreviewScreen(
                             verticalArrangement = Arrangement.spacedBy(8.dp),
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            SelectedQuality.values().forEach { quality ->
-                                val isSelected = selectedQuality == quality
+                            if (details.downloadOptions.isEmpty()) {
+                                GlassCard(modifier = Modifier.fillMaxWidth()) {
+                                    Text(
+                                        text = "No media options found. Add your resolver API details in gradle.properties.",
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        fontSize = 13.sp,
+                                        modifier = Modifier.padding(14.dp)
+                                    )
+                                }
+                            }
+                            details.downloadOptions.forEach { option ->
+                                val isSelected = selectedOption == option
                                 GlassCard(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .clickable { viewModel.selectQuality(quality) }
+                                        .clickable { viewModel.selectOption(option) }
                                 ) {
                                     Row(
                                         modifier = Modifier
@@ -330,15 +342,22 @@ fun VideoPreviewScreen(
                                                 modifier = Modifier.size(20.dp)
                                             )
                                             Spacer(modifier = Modifier.width(12.dp))
+                                            Icon(
+                                                imageVector = if (option.hasVideo) Icons.Default.Videocam else Icons.Default.Audiotrack,
+                                                contentDescription = null,
+                                                tint = if (isSelected) CyberCyan else Color.Gray,
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(8.dp))
                                             Text(
-                                                text = quality.label,
+                                                text = option.label,
                                                 color = if (isSelected) Color.White else Color.LightGray,
                                                 fontSize = 14.sp,
                                                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
                                             )
                                         }
                                         Text(
-                                            text = quality.size,
+                                            text = option.sizeLabel,
                                             color = if (isSelected) CyberCyan else Color.Gray,
                                             fontSize = 13.sp,
                                             fontWeight = FontWeight.Bold
@@ -398,7 +417,7 @@ fun VideoPreviewScreen(
                             buttonState = downloadState,
                             progress = downloadProgress,
                             onClick = {
-                                viewModel.startDownload { title, qual ->
+                                viewModel.startDownload { title, option ->
                                     Toast.makeText(context, "Added to downloads", Toast.LENGTH_SHORT).show()
                                     // Navigate to Download Manager screen
                                     navController.navigate(Screen.DownloadManager.route) {

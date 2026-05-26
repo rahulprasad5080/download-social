@@ -17,6 +17,21 @@ android {
         versionName = "1.0.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        buildConfigField(
+            "String",
+            "SOCIAL_DOWNLOADER_BASE_URL",
+            "\"${project.findProperty("socialDownloaderBaseUrl") ?: "https://example.com/"}\""
+        )
+        buildConfigField(
+            "String",
+            "SOCIAL_DOWNLOADER_ENDPOINT",
+            "\"${project.findProperty("socialDownloaderEndpoint") ?: "api/download"}\""
+        )
+        buildConfigField(
+            "String",
+            "SOCIAL_DOWNLOADER_TOKEN",
+            "\"${project.findProperty("socialDownloaderToken") ?: ""}\""
+        )
         vectorDrawables {
             useSupportLibrary = true
         }
@@ -44,6 +59,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
     composeOptions {
         kotlinCompilerExtensionVersion = "1.5.8"
@@ -88,6 +104,10 @@ dependencies {
 
     // Coil (Image loading)
     implementation("io.coil-kt:coil-compose:2.5.0")
+
+    // Retrofit for resolving social links into downloadable media
+    implementation("com.squareup.retrofit2:retrofit:2.9.0")
+    implementation("com.squareup.retrofit2:converter-gson:2.9.0")
 
     // Testing
     testImplementation("junit:junit:4.13.2")
