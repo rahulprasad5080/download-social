@@ -44,6 +44,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -57,6 +58,7 @@ import com.socialhub.downloader.ui.navigation.Screen
 import com.socialhub.downloader.ui.theme.CyberCyan
 import com.socialhub.downloader.ui.theme.ElectricPurple
 import com.socialhub.downloader.ui.theme.NeonPink
+import coil.compose.AsyncImage
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -71,9 +73,17 @@ fun VideoPreviewScreen(
     val selectedQuality by viewModel.selectedQuality.collectAsState()
     val downloadState by viewModel.downloadState.collectAsState()
     val downloadProgress by viewModel.downloadProgress.collectAsState()
+    val downloadMessage by viewModel.downloadMessage.collectAsState()
 
     LaunchedEffect(key1 = videoUrl) {
         viewModel.loadVideoDetails(videoUrl)
+    }
+
+    LaunchedEffect(downloadMessage) {
+        downloadMessage?.let { message ->
+            Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+            viewModel.clearDownloadMessage()
+        }
     }
 
     Scaffold(
@@ -163,6 +173,27 @@ fun VideoPreviewScreen(
                                 ),
                             contentAlignment = Alignment.Center
                         ) {
+                            if (details.thumbnailUrl.isNotBlank()) {
+                                AsyncImage(
+                                    model = details.thumbnailUrl,
+                                    contentDescription = details.title,
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .background(
+                                            Brush.verticalGradient(
+                                                listOf(
+                                                    Color.Black.copy(alpha = 0.05f),
+                                                    Color.Black.copy(alpha = 0.55f)
+                                                )
+                                            )
+                                        )
+                                )
+                            }
+
                             // Video Icon
                             Box(
                                 modifier = Modifier

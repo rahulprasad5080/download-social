@@ -2,15 +2,18 @@ package com.socialhub.downloader.ui.screens.preview
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.socialhub.downloader.data.DownloadRepository
 import com.socialhub.downloader.ui.components.DownloadButtonState
 import com.socialhub.downloader.ui.components.SocialPlatform
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import org.json.JSONObject
+import java.net.URL
 import javax.inject.Inject
 
 enum class SelectedQuality(val label: String, val size: String, val extension: String) {
@@ -26,14 +29,13 @@ data class VideoDetails(
     val duration: String,
     val creatorName: String,
     val creatorAvatarUrl: String,
+    val thumbnailUrl: String,
     val views: String,
     val likes: String
 )
 
 @HiltViewModel
-class VideoPreviewViewModel @Inject constructor(
-    private val downloadRepository: DownloadRepository
-) : ViewModel() {
+class VideoPreviewViewModel @Inject constructor() : ViewModel() {
 
     private val _isLoading = MutableStateFlow(true)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
@@ -49,6 +51,9 @@ class VideoPreviewViewModel @Inject constructor(
 
     private val _downloadProgress = MutableStateFlow(0f)
     val downloadProgress: StateFlow<Float> = _downloadProgress.asStateFlow()
+
+    private val _downloadMessage = MutableStateFlow<String?>(null)
+    val downloadMessage: StateFlow<String?> = _downloadMessage.asStateFlow()
 
     fun loadVideoDetails(url: String) {
         viewModelScope.launch {
@@ -71,19 +76,22 @@ class VideoPreviewViewModel @Inject constructor(
         }
     }
 
-    private fun extractDetailsFromUrl(url: String, platform: SocialPlatform): VideoDetails {
+    private suspend fun extractDetailsFromUrl(url: String, platform: SocialPlatform): VideoDetails {
         var title = ""
         var creator = ""
+        var thumbnailUrl = ""
         
         try {
             val uri = android.net.Uri.parse(url)
-            val path = uri.path ?: ""
             val host = uri.host ?: ""
             
             if (platform == SocialPlatform.YOUTUBE) {
-                val vParam = uri.getQueryParameter("v")
-                if (!vParam.isNullOrEmpty()) {
-                    title = vParam.replace("-", " ").replace("_", " ")
+                val videoId = extractYoutubeVideoId(uri)
+                if (!videoId.isNullOrBlank()) {
+                    thumbnailUrl = "https://img.youtube.com/vi/$videoId/hqdefault.jpg"
+                    title = fetchYoutubeTitle(url).ifBlank {
+                        "YouTube video $videoId"
+                    }
                 } else {
                     val segments = uri.pathSegments
                     if (segments.isNotEmpty()) {
@@ -131,59 +139,51 @@ class VideoPreviewViewModel @Inject constructor(
             },
             creatorName = creator,
             creatorAvatarUrl = "",
+            thumbnailUrl = thumbnailUrl,
             views = "${url.length.coerceAtLeast(1)} chars",
             likes = platform.displayName
         )
+    }
+
+    private fun extractYoutubeVideoId(uri: android.net.Uri): String? {
+        uri.getQueryParameter("v")?.takeIf { it.isNotBlank() }?.let { return it }
+
+        val host = uri.host.orEmpty()
+        val segments = uri.pathSegments
+        return when {
+            host.contains("youtu.be") && segments.isNotEmpty() -> segments.first()
+            segments.size >= 2 && segments.first() in listOf("shorts", "embed", "live") -> segments[1]
+            else -> null
+        }
+    }
+
+    private suspend fun fetchYoutubeTitle(url: String): String = withContext(Dispatchers.IO) {
+        runCatching {
+            val encodedUrl = java.net.URLEncoder.encode(url, "UTF-8")
+            val connection = URL("https://www.youtube.com/oembed?url=$encodedUrl&format=json").openConnection()
+            connection.connectTimeout = 5000
+            connection.readTimeout = 5000
+            val json = connection.getInputStream().bufferedReader().use { it.readText() }
+            JSONObject(json).optString("title")
+        }.getOrDefault("")
     }
 
     fun selectQuality(quality: SelectedQuality) {
         _selectedQuality.value = quality
     }
 
+    fun clearDownloadMessage() {
+        _downloadMessage.value = null
+    }
+
     fun startDownload(onDownloadCompleted: (String, SelectedQuality) -> Unit) {
         viewModelScope.launch {
-            val details = _videoDetails.value ?: return@launch
-            
-            // State: Idle -> Preparing
-            _downloadState.value = DownloadButtonState.PREPARING
-            delay(400)
-            
-            // State: Preparing -> Downloading
-            _downloadState.value = DownloadButtonState.DOWNLOADING
-            val downloadId = downloadRepository.startDownload(
-                title = details.title,
-                platform = details.platform,
-                sizeLabel = _selectedQuality.value.size
-            )
-            var currentProgress = 0f
-            while (currentProgress < 1.0f) {
-                delay(150)
-                currentProgress += 0.05f
-                val progress = currentProgress.coerceAtMost(1f)
-                val remainingSec = ((1f - progress) * 8).toInt().coerceAtLeast(1)
-                _downloadProgress.value = progress
-                downloadRepository.updateProgress(
-                    id = downloadId,
-                    progress = progress,
-                    speedLabel = "Resolving",
-                    remainingTime = "${remainingSec}s"
-                )
-            }
-            
-            // State: Downloading -> Completed
-            _downloadState.value = DownloadButtonState.COMPLETED
-            downloadRepository.completeDownload(
-                id = downloadId,
-                duration = details.duration,
-                filePath = "content://com.socialhub.downloader/downloads/$downloadId${_selectedQuality.value.extension}"
-            )
-            delay(1000)
-            
-            onDownloadCompleted(details.title, _selectedQuality.value)
-            
-            // Reset state
+            _downloadMessage.value = null
+
+            _downloadState.value = DownloadButtonState.ERROR
+            _downloadMessage.value = "Download service is not connected yet. No file was saved."
+            delay(1600)
             _downloadState.value = DownloadButtonState.IDLE
-            _downloadProgress.value = 0f
         }
     }
 }

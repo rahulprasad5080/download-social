@@ -42,7 +42,8 @@ enum class DownloadButtonState {
     IDLE,
     PREPARING,
     DOWNLOADING,
-    COMPLETED
+    COMPLETED,
+    ERROR
 }
 
 @OptIn(ExperimentalAnimationApi::class)
@@ -68,6 +69,7 @@ fun AnimatedDownloadButton(
             DownloadButtonState.PREPARING -> Color(0xFF6B21A8)
             DownloadButtonState.DOWNLOADING -> CyberCyan
             DownloadButtonState.COMPLETED -> Color(0xFF10B981)
+            DownloadButtonState.ERROR -> Color(0xFFDC2626)
         },
         animationSpec = tween(transitionDuration),
         label = "ButtonColor"
@@ -84,6 +86,7 @@ fun AnimatedDownloadButton(
                         DownloadButtonState.PREPARING -> listOf(Color(0xFF6B21A8), Color(0xFF7E22CE))
                         DownloadButtonState.DOWNLOADING -> listOf(CyberCyan, Color(0xFF0891B2))
                         DownloadButtonState.COMPLETED -> listOf(Color(0xFF10B981), Color(0xFF059669))
+                        DownloadButtonState.ERROR -> listOf(Color(0xFFDC2626), Color(0xFF991B1B))
                     }
                 )
             )
@@ -155,6 +158,14 @@ fun AnimatedDownloadButton(
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             text = "Added to Downloads",
+                            color = Color.White,
+                            fontSize = 16.sp,
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                    }
+                    DownloadButtonState.ERROR -> {
+                        Text(
+                            text = "Download unavailable",
                             color = Color.White,
                             fontSize = 16.sp,
                             style = MaterialTheme.typography.titleMedium

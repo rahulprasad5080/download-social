@@ -5,7 +5,6 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -25,9 +24,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.DownloadDone
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.InsertDriveFile
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Divider
@@ -55,7 +54,6 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.socialhub.downloader.ui.components.GlassCard
-import com.socialhub.downloader.ui.navigation.Screen
 import com.socialhub.downloader.ui.theme.CyberCyan
 import com.socialhub.downloader.ui.theme.ElectricPurple
 
@@ -293,9 +291,6 @@ fun DownloadManagerScreen(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(horizontal = 16.dp, vertical = 6.dp)
-                                    .clickable {
-                                        navController.navigate(Screen.MediaPlayer.createRoute(completed.filePath))
-                                    }
                             ) {
                                 Row(
                                     modifier = Modifier
@@ -303,7 +298,7 @@ fun DownloadManagerScreen(
                                         .padding(12.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    // Play icon layout
+                                    // File icon layout
                                     Box(
                                         modifier = Modifier
                                             .size(40.dp)
@@ -312,8 +307,8 @@ fun DownloadManagerScreen(
                                         contentAlignment = Alignment.Center
                                     ) {
                                         Icon(
-                                            imageVector = Icons.Default.PlayArrow,
-                                            contentDescription = "Play",
+                                            imageVector = Icons.Default.InsertDriveFile,
+                                            contentDescription = "Downloaded file",
                                             tint = Color.White,
                                             modifier = Modifier.size(24.dp)
                                         )
