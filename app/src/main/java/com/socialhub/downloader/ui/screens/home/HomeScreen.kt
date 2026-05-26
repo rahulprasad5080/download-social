@@ -20,7 +20,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -55,9 +54,7 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.socialhub.downloader.ui.components.GlassCard
-import com.socialhub.downloader.ui.components.PlatformIcon
 import com.socialhub.downloader.ui.components.RecentDownloadsSkeleton
-import com.socialhub.downloader.ui.components.SocialPlatform
 import com.socialhub.downloader.ui.components.TrendingSkeleton
 import com.socialhub.downloader.ui.navigation.Screen
 import com.socialhub.downloader.ui.theme.CyberCyan
@@ -249,7 +246,7 @@ fun HomeScreen(
                 }
             }
 
-            // Quick platform select icons
+            // Active Downloads
             item {
                 Column(
                     modifier = Modifier
@@ -257,52 +254,22 @@ fun HomeScreen(
                         .padding(vertical = 12.dp)
                 ) {
                     Text(
-                        text = "Quick Platform Input",
-                        style = MaterialTheme.typography.titleMedium.copy(color = Color.White),
-                        modifier = Modifier.padding(start = 16.dp, top = 0.dp, end = 16.dp, bottom = 8.dp)
-                    )
-                    LazyRow(
-                        contentPadding = PaddingValues(horizontal = 16.dp),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        items(SocialPlatform.values()) { platform ->
-                            PlatformIcon(
-                                platform = platform,
-                                onClick = {
-                                    val demoUrl = when (platform) {
-                                        SocialPlatform.INSTAGRAM -> "https://instagram.com/reel/C8a1B8pM2f9"
-                                        SocialPlatform.YOUTUBE -> "https://youtube.com/watch?v=dQw4w9WgXcQ"
-                                        SocialPlatform.FACEBOOK -> "https://facebook.com/watch?v=1020491823"
-                                        SocialPlatform.TIKTOK -> "https://tiktok.com/@creator/video/9871625"
-                                        SocialPlatform.X -> "https://x.com/tech/status/192841"
-                                        SocialPlatform.PINTEREST -> "https://pinterest.com/pin/18274129"
-                                        SocialPlatform.THREADS -> "https://threads.net/@user/post/Cw182f"
-                                    }
-                                    viewModel.onUrlChange(demoUrl)
-                                }
-                            )
-                        }
-                    }
-                }
-            }
-
-            // Trending Downloads
-            item {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 12.dp)
-                ) {
-                    Text(
-                        text = "Trending Downloads",
+                        text = "Active Downloads",
                         style = MaterialTheme.typography.titleMedium.copy(color = Color.White),
                         modifier = Modifier.padding(start = 16.dp, top = 0.dp, end = 16.dp, bottom = 8.dp)
                     )
 
                     if (isLoading) {
                         TrendingSkeleton()
+                    } else if (trendingList.isEmpty()) {
+                        Text(
+                            text = "No active downloads",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontSize = 13.sp,
+                            modifier = Modifier.padding(horizontal = 16.dp)
+                        )
                     } else {
-                        LazyRow(
+                        androidx.compose.foundation.lazy.LazyRow(
                             contentPadding = PaddingValues(horizontal = 16.dp),
                             horizontalArrangement = Arrangement.spacedBy(16.dp)
                         ) {
@@ -310,13 +277,6 @@ fun HomeScreen(
                                 GlassCard(
                                     modifier = Modifier
                                         .width(160.dp)
-                                        .clickable {
-                                            val demoUrl = when (item.platform) {
-                                                SocialPlatform.YOUTUBE -> "https://youtube.com/watch?v=dQw4w9WgXcQ"
-                                                else -> "https://instagram.com/reel/C8a1B8pM2f9"
-                                            }
-                                            navController.navigate(Screen.VideoPreview.createRoute(demoUrl))
-                                        }
                                 ) {
                                     Column(
                                         modifier = Modifier.padding(8.dp)
@@ -377,7 +337,7 @@ fun HomeScreen(
                                             horizontalArrangement = Arrangement.SpaceBetween
                                         ) {
                                             Text(text = item.size, color = CyberCyan, fontSize = 10.sp)
-                                            Text(text = item.views, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 10.sp)
+                                            Text(text = item.progressLabel, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 10.sp)
                                         }
                                     }
                                 }
@@ -402,6 +362,13 @@ fun HomeScreen(
 
                     if (isLoading) {
                         RecentDownloadsSkeleton()
+                    } else if (recentList.isEmpty()) {
+                        Text(
+                            text = "No completed downloads",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontSize = 13.sp,
+                            modifier = Modifier.padding(horizontal = 16.dp)
+                        )
                     } else {
                         Column(
                             modifier = Modifier.padding(horizontal = 16.dp),
@@ -409,7 +376,11 @@ fun HomeScreen(
                         ) {
                             recentList.forEach { item ->
                                 GlassCard(
-                                    modifier = Modifier.fillMaxWidth()
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable {
+                                            navController.navigate(Screen.MediaPlayer.createRoute(item.filePath))
+                                        }
                                 ) {
                                     Row(
                                         modifier = Modifier

@@ -123,10 +123,14 @@ fun MainAppShell(
         Surface(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(bottom = if (isBottomBarVisible) 92.dp else 0.dp), // handle navigation bar padding manually
+                .padding(paddingValues),
             color = MaterialTheme.colorScheme.background
         ) {
-            NavGraph(navController = navController)
+            NavGraph(
+                navController = navController,
+                isDarkTheme = isDarkTheme,
+                onThemeChange = onThemeChange
+            )
         }
     }
 }

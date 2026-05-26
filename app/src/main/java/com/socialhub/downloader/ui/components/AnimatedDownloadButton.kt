@@ -154,7 +154,7 @@ fun AnimatedDownloadButton(
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "Saved to Gallery",
+                            text = "Added to Downloads",
                             color = Color.White,
                             fontSize = 16.sp,
                             style = MaterialTheme.typography.titleMedium

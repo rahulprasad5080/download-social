@@ -1,5 +1,7 @@
 package com.socialhub.downloader.ui.screens.player
 
+import android.net.Uri
+import android.view.ViewGroup
 import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -37,7 +39,6 @@ import androidx.compose.material.icons.filled.PlaylistPlay
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.filled.Speed
-import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -47,6 +48,7 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -66,7 +68,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.media3.common.C
+import androidx.media3.common.MediaItem
+import androidx.media3.common.util.UnstableApi
+import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.ui.PlayerView
 import androidx.navigation.NavController
 import com.socialhub.downloader.ui.components.GestureType
 import com.socialhub.downloader.ui.components.GlassCard
@@ -75,8 +83,10 @@ import com.socialhub.downloader.ui.theme.CyberCyan
 import com.socialhub.downloader.ui.theme.ElectricPurple
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.io.File
 
 @Composable
+@androidx.annotation.OptIn(UnstableApi::class)
 fun MediaPlayerScreen(
     mediaPath: String,
     navController: NavController,
@@ -103,6 +113,48 @@ fun MediaPlayerScreen(
     var showSpeedMenu by remember { mutableStateOf(false) }
     
     var screenWidth by remember { mutableStateOf(0) }
+    val player = remember(context) {
+        ExoPlayer.Builder(context).build().apply {
+            repeatMode = androidx.media3.common.Player.REPEAT_MODE_OFF
+            playWhenReady = true
+        }
+    }
+
+    DisposableEffect(player) {
+        onDispose { player.release() }
+    }
+
+    LaunchedEffect(mediaPath) {
+        viewModel.setNowPlayingFromPath(mediaPath)
+    }
+
+    LaunchedEffect(trackIndex, playlist) {
+        val source = playlist.getOrNull(trackIndex)?.source.orEmpty()
+        if (source.isNotBlank()) {
+            val uri = source.toMediaUri()
+            player.setMediaItem(MediaItem.fromUri(uri))
+            player.prepare()
+        }
+    }
+
+    LaunchedEffect(player, isPlaying, trackIndex) {
+        while (true) {
+            val playerDuration = player.duration
+            if (playerDuration != C.TIME_UNSET) {
+                viewModel.updateDuration(playerDuration)
+            }
+            viewModel.updatePlaybackPosition(player.currentPosition)
+            delay(500)
+        }
+    }
+
+    LaunchedEffect(isPlaying) {
+        player.playWhenReady = isPlaying
+    }
+
+    LaunchedEffect(speed) {
+        player.setPlaybackSpeed(speed)
+    }
 
     // Auto hide controls after 4s
     LaunchedEffect(showControls, isPlaying) {
@@ -158,32 +210,22 @@ fun MediaPlayerScreen(
             }
             .clickable { showControls = !showControls }
     ) {
-        // Video Preview Simulated Canvas (Immersive Space Background)
-        Box(
+        AndroidView(
+            factory = { viewContext ->
+                PlayerView(viewContext).apply {
+                    this.player = player
+                    useController = false
+                    layoutParams = ViewGroup.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.MATCH_PARENT
+                    )
+                }
+            },
+            update = { it.player = player },
             modifier = Modifier
                 .fillMaxSize()
-                .background(
-                    brush = Brush.radialGradient(
-                        colors = listOf(Color(0xFF1E1E38), Color(0xFF07070F)),
-                        radius = 1200f
-                    )
-                ),
-            contentAlignment = Alignment.Center
-        ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Icon(
-                    imageVector = Icons.Default.VolumeUp,
-                    contentDescription = null,
-                    tint = Color.White.copy(alpha = 0.1f),
-                    modifier = Modifier.size(120.dp)
-                )
-                Text(
-                    text = "Playing: ${playlist.getOrNull(trackIndex)?.title ?: "Media File"}",
-                    color = Color.White.copy(alpha = 0.4f),
-                    fontSize = 14.sp
-                )
-            }
-        }
+                .background(Color.Black)
+        )
 
         // Gesture Overlay Feedback HUD
         MediaControlOverlay(
@@ -302,8 +344,12 @@ fun MediaPlayerScreen(
                         Text(text = formatTime(position), color = Color.White, fontSize = 11.sp)
                         Slider(
                             value = position.toFloat(),
-                            onValueChange = { viewModel.seekTo(it.toLong()) },
-                            valueRange = 0f..duration.toFloat(),
+                            onValueChange = {
+                                val newPosition = it.toLong()
+                                player.seekTo(newPosition)
+                                viewModel.seekTo(newPosition)
+                            },
+                            valueRange = 0f..duration.coerceAtLeast(1L).toFloat(),
                             modifier = Modifier
                                 .weight(1f)
                                 .padding(horizontal = 8.dp),
@@ -440,7 +486,7 @@ fun MediaPlayerScreen(
                                         if (isCurrent) ElectricPurple.copy(alpha = 0.25f) else Color.Transparent
                                     )
                                     .clickable {
-                                        viewModel.playNextTrack() // simulate selecting index
+                                        viewModel.selectTrack(index)
                                         showPlaylistDrawer = false
                                     }
                                     .padding(10.dp),
@@ -478,3 +524,9 @@ fun MediaPlayerScreen(
         }
     }
 }
+
+private fun String.toMediaUri(): Uri =
+    when {
+        startsWith("content://") || startsWith("http://") || startsWith("https://") -> Uri.parse(this)
+        else -> Uri.fromFile(File(this))
+    }

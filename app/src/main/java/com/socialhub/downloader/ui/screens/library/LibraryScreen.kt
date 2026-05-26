@@ -64,6 +64,12 @@ import com.socialhub.downloader.ui.navigation.Screen
 import com.socialhub.downloader.ui.theme.CyberCyan
 import com.socialhub.downloader.ui.theme.ElectricPurple
 import com.socialhub.downloader.ui.theme.NeonPink
+import java.util.Locale
+
+private fun Enum<*>.displayLabel(): String =
+    name.lowercase(Locale.getDefault()).replaceFirstChar { firstChar ->
+        if (firstChar.isLowerCase()) firstChar.titlecase(Locale.getDefault()) else firstChar.toString()
+    }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -128,7 +134,7 @@ fun LibraryScreen(
                         onClick = { viewModel.setTab(tab) },
                         text = {
                             Text(
-                                text = tab.name.toLowerCase().capitalize(),
+                                text = tab.displayLabel(),
                                 fontSize = 13.sp,
                                 fontWeight = if (currentTab == tab) FontWeight.Bold else FontWeight.Normal
                             )
@@ -150,14 +156,10 @@ fun LibraryScreen(
                         FilterChip(
                             selected = isSelected,
                             onClick = { viewModel.setSortOption(option) },
-                            label = { Text(option.name.toLowerCase().capitalize(), color = if (isSelected) Color.White else Color.Gray) },
+                            label = { Text(option.displayLabel(), color = if (isSelected) Color.White else Color.Gray) },
                             colors = FilterChipDefaults.filterChipColors(
                                 selectedContainerColor = ElectricPurple,
                                 containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
-                            ),
-                            border = FilterChipDefaults.filterChipBorder(
-                                borderColor = Color.Transparent,
-                                selectedBorderColor = Color.Transparent
                             )
                         )
                     }
@@ -212,7 +214,7 @@ fun LibraryScreen(
                                     overflow = TextOverflow.Ellipsis
                                 )
                                 Text(
-                                    text = "${folder.itemCount} items • ${folder.storageSize}",
+                                    text = "${folder.itemCount} items - ${folder.storageSize}",
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     fontSize = 11.sp
                                 )
@@ -303,7 +305,7 @@ fun LibraryScreen(
                                                 )
                                             }
                                             Text(
-                                                text = "${item.sizeLabel} • ${item.dateLabel}",
+                                                text = "${item.sizeLabel} - ${item.dateLabel}",
                                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                                 fontSize = 11.sp
                                             )

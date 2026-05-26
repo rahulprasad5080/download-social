@@ -1,11 +1,20 @@
 package com.socialhub.downloader.ui.screens.library
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.socialhub.downloader.data.DownloadRepository
 import com.socialhub.downloader.ui.components.SocialPlatform
+import com.socialhub.downloader.ui.screens.download.CompletedDownload
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
+import java.text.DateFormat
+import java.util.Date
 import javax.inject.Inject
 
 enum class LibraryTab {
@@ -40,7 +49,9 @@ data class FolderItem(
 )
 
 @HiltViewModel
-class LibraryViewModel @Inject constructor() : ViewModel() {
+class LibraryViewModel @Inject constructor(
+    private val downloadRepository: DownloadRepository
+) : ViewModel() {
 
     private val _currentTab = MutableStateFlow(LibraryTab.VIDEOS)
     val currentTab: StateFlow<LibraryTab> = _currentTab.asStateFlow()
@@ -48,29 +59,29 @@ class LibraryViewModel @Inject constructor() : ViewModel() {
     private val _sortOption = MutableStateFlow(SortOption.ALL)
     val sortOption: StateFlow<SortOption> = _sortOption.asStateFlow()
 
-    private val _items = MutableStateFlow<List<LibraryItem>>(emptyList())
-    val items: StateFlow<List<LibraryItem>> = _items.asStateFlow()
+    private val favoriteIds = MutableStateFlow<Set<String>>(emptySet())
 
-    private val _folders = MutableStateFlow<List<FolderItem>>(emptyList())
-    val folders: StateFlow<List<FolderItem>> = _folders.asStateFlow()
+    val items: StateFlow<List<LibraryItem>> = combine(
+        downloadRepository.completedDownloads,
+        favoriteIds
+    ) { downloads, favorites ->
+        downloads.map { it.toLibraryItem(favorites.contains(it.id)) }
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
-    init {
-        // Load initial mock library items
-        _items.value = listOf(
-            LibraryItem("l1", "Cool Tech Hacks Compilation", SocialPlatform.YOUTUBE, "45.8 MB", "1 day ago", true, true, "/storage/emulated/0/Download/SocialHub/tech.mp4"),
-            LibraryItem("l2", "Norway Fjords Vlog", SocialPlatform.INSTAGRAM, "18.3 MB", "2 days ago", true, true, "/storage/emulated/0/Download/SocialHub/norway.mp4"),
-            LibraryItem("l3", "Acoustic Guitar Loop Track", SocialPlatform.TIKTOK, "6.2 MB", "4 days ago", false, false, "/storage/emulated/0/Download/SocialHub/guitar.mp3"),
-            LibraryItem("l4", "Lo-Fi Beats 1 Hour Study", SocialPlatform.YOUTUBE, "142 MB", "1 week ago", false, false, "/storage/emulated/0/Download/SocialHub/lofi.mp3"),
-            LibraryItem("l5", "Cinematic drone shots 4K", SocialPlatform.X, "122 MB", "2 weeks ago", true, true, "/storage/emulated/0/Download/SocialHub/drone.mp4")
-        )
-
-        _folders.value = listOf(
-            FolderItem("f1", "Instagram Reels", 12, "240 MB"),
-            FolderItem("f2", "YouTube Videos", 8, "512 MB"),
-            FolderItem("f3", "TikTok Audios", 24, "104 MB"),
-            FolderItem("f4", "X Status Media", 4, "84 MB")
-        )
-    }
+    val folders: StateFlow<List<FolderItem>> = downloadRepository.completedDownloads
+        .map { downloads ->
+            downloads
+                .groupBy { it.platform }
+                .map { (platform, items) ->
+                    FolderItem(
+                        id = platform.name,
+                        name = platform.displayName,
+                        itemCount = items.size,
+                        storageSize = formatBytes(items.sumOf { it.sizeLabel.toBytes() })
+                    )
+                }
+        }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     fun setTab(tab: LibraryTab) {
         _currentTab.value = tab
@@ -81,12 +92,45 @@ class LibraryViewModel @Inject constructor() : ViewModel() {
     }
 
     fun toggleFavorite(id: String) {
-        _items.value = _items.value.map {
-            if (it.id == id) it.copy(isFavorite = !it.isFavorite) else it
+        favoriteIds.value = if (favoriteIds.value.contains(id)) {
+            favoriteIds.value - id
+        } else {
+            favoriteIds.value + id
         }
     }
 
     fun deleteItem(id: String) {
-        _items.value = _items.value.filter { it.id != id }
+        downloadRepository.deleteCompleted(id)
+        favoriteIds.value = favoriteIds.value - id
+    }
+
+    private fun CompletedDownload.toLibraryItem(isFavorite: Boolean) = LibraryItem(
+        id = id,
+        title = title,
+        platform = platform,
+        sizeLabel = sizeLabel,
+        dateLabel = DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(Date(createdAtMillis)),
+        isFavorite = isFavorite,
+        isVideo = !filePath.endsWith(".mp3", ignoreCase = true),
+        filePath = filePath
+    )
+
+    private fun String.toBytes(): Long {
+        val number = substringBefore(" ").toDoubleOrNull() ?: return 0L
+        return when {
+            contains("GB", ignoreCase = true) -> (number * 1024 * 1024 * 1024).toLong()
+            contains("MB", ignoreCase = true) -> (number * 1024 * 1024).toLong()
+            contains("KB", ignoreCase = true) -> (number * 1024).toLong()
+            else -> number.toLong()
+        }
+    }
+
+    private fun formatBytes(bytes: Long): String {
+        val mb = bytes / (1024.0 * 1024.0)
+        return if (mb >= 1024) {
+            String.format("%.1f GB", mb / 1024.0)
+        } else {
+            String.format("%.1f MB", mb)
+        }
     }
 }

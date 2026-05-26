@@ -17,7 +17,11 @@ import com.socialhub.downloader.ui.screens.profile.ProfileScreen
 import com.socialhub.downloader.ui.screens.splash.SplashScreen
 
 @Composable
-fun NavGraph(navController: NavHostController) {
+fun NavGraph(
+    navController: NavHostController,
+    isDarkTheme: Boolean,
+    onThemeChange: (Boolean) -> Unit
+) {
     NavHost(
         navController = navController,
         startDestination = Screen.Splash.route,
@@ -59,7 +63,11 @@ fun NavGraph(navController: NavHostController) {
         }
         
         composable(Screen.Profile.route) {
-            ProfileScreen(navController = navController)
+            ProfileScreen(
+                navController = navController,
+                isDarkTheme = isDarkTheme,
+                onThemeChange = onThemeChange
+            )
         }
     }
 }

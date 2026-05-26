@@ -1,14 +1,11 @@
 package com.socialhub.downloader.ui.screens.player
 
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.launch
+import java.io.File
 import javax.inject.Inject
 
 data class PlaylistItem(
@@ -29,7 +26,7 @@ class PlayerViewModel @Inject constructor() : ViewModel() {
     private val _currentPosition = MutableStateFlow(0L)
     val currentPosition: StateFlow<Long> = _currentPosition.asStateFlow()
 
-    private val _totalDuration = MutableStateFlow(160000L) // 2m 40s in ms
+    private val _totalDuration = MutableStateFlow(0L)
     val totalDuration: StateFlow<Long> = _totalDuration.asStateFlow()
 
     private val _volume = MutableStateFlow(0.7f)
@@ -50,44 +47,22 @@ class PlayerViewModel @Inject constructor() : ViewModel() {
     private val _currentTrackIndex = MutableStateFlow(0)
     val currentTrackIndex: StateFlow<Int> = _currentTrackIndex.asStateFlow()
 
-    private var progressJob: Job? = null
-
-    init {
-        _playlist.value = listOf(
-            PlaylistItem("Space X Launch stream clip", "/storage/emulated/0/Download/SocialHub/spacex.mp4", "2:40"),
-            PlaylistItem("TikTok trending compilation", "/storage/emulated/0/Download/SocialHub/tiktok_cook.mp4", "1:15"),
-            CompletedDownloadDetails("Kotlin Coroutine Deep Dive", "10:24")
-        )
-        startProgressTracker()
-    }
-
-    private fun CompletedDownloadDetails(title: String, duration: String) =
-        PlaylistItem(title, "/storage/emulated/0/Download/SocialHub/kotlin.mp4", duration)
-
-    private fun startProgressTracker() {
-        progressJob?.cancel()
-        progressJob = viewModelScope.launch {
-            while (true) {
-                delay(1000)
-                if (_isPlaying.value) {
-                    val nextPos = _currentPosition.value + (1000 * _playbackSpeed.value).toLong()
-                    if (nextPos >= _totalDuration.value) {
-                        _currentPosition.value = 0L
-                        playNextTrack()
-                    } else {
-                        _currentPosition.value = nextPos
-                    }
-                }
-            }
-        }
-    }
-
     fun togglePlayPause() {
         _isPlaying.value = !_isPlaying.value
     }
 
     fun seekTo(position: Long) {
         _currentPosition.value = position.coerceIn(0L, _totalDuration.value)
+    }
+
+    fun updatePlaybackPosition(position: Long) {
+        _currentPosition.value = position.coerceAtLeast(0L)
+    }
+
+    fun updateDuration(duration: Long) {
+        if (duration > 0) {
+            _totalDuration.value = duration
+        }
     }
 
     fun setPlaybackSpeed(speed: Float) {
@@ -110,24 +85,49 @@ class PlayerViewModel @Inject constructor() : ViewModel() {
         _isMiniPlayer.value = !_isMiniPlayer.value
     }
 
-    fun playNextTrack() {
-        val nextIndex = (_currentTrackIndex.value + 1) % _playlist.value.size
-        _currentTrackIndex.value = nextIndex
+    fun setNowPlayingFromPath(path: String) {
+        if (path.isBlank()) return
+
+        val currentPlaylist = _playlist.value.toMutableList()
+        val existingIndex = currentPlaylist.indexOfFirst { it.source == path }
+        val selectedIndex = if (existingIndex >= 0) {
+            existingIndex
+        } else {
+            currentPlaylist.add(0, PlaylistItem(titleFromPath(path), path, "--:--"))
+            0
+        }
+
+        _playlist.value = currentPlaylist
+        selectTrack(selectedIndex)
+    }
+
+    fun selectTrack(index: Int) {
+        if (index !in _playlist.value.indices) return
+
+        _currentTrackIndex.value = index
         _currentPosition.value = 0L
-        // update duration mock
-        _totalDuration.value = if (nextIndex == 1) 75000L else if (nextIndex == 2) 624000L else 160000L
+    }
+
+    fun playNextTrack() {
+        if (_playlist.value.isEmpty()) return
+        val nextIndex = (_currentTrackIndex.value + 1) % _playlist.value.size
+        selectTrack(nextIndex)
     }
 
     fun playPreviousTrack() {
+        if (_playlist.value.isEmpty()) return
         var prevIndex = _currentTrackIndex.value - 1
         if (prevIndex < 0) prevIndex = _playlist.value.size - 1
-        _currentTrackIndex.value = prevIndex
-        _currentPosition.value = 0L
-        _totalDuration.value = if (prevIndex == 1) 75000L else if (prevIndex == 2) 624000L else 160000L
+        selectTrack(prevIndex)
     }
 
-    override fun onCleared() {
-        super.onCleared()
-        progressJob?.cancel()
+    private fun titleFromPath(path: String): String {
+        val filename = File(path).nameWithoutExtension.ifBlank { path.substringAfterLast('/') }
+        return filename
+            .replace('_', ' ')
+            .replace('-', ' ')
+            .ifBlank { "Media File" }
+            .replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
     }
+
 }

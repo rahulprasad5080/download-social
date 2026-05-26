@@ -242,7 +242,7 @@ fun VideoPreviewScreen(
                                     fontSize = 13.sp
                                 )
                                 Text(
-                                    text = "${details.views} • ${details.likes}",
+                                    text = "${details.views} - ${details.likes}",
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     fontSize = 11.sp
                                 )
@@ -368,7 +368,7 @@ fun VideoPreviewScreen(
                             progress = downloadProgress,
                             onClick = {
                                 viewModel.startDownload { title, qual ->
-                                    Toast.makeText(context, "Download started!", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(context, "Added to downloads", Toast.LENGTH_SHORT).show()
                                     // Navigate to Download Manager screen
                                     navController.navigate(Screen.DownloadManager.route) {
                                         popUpTo(Screen.Home.route)

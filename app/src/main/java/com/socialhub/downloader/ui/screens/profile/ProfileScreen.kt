@@ -65,10 +65,11 @@ import com.socialhub.downloader.ui.theme.NeonPink
 @Composable
 fun ProfileScreen(
     navController: NavController,
+    isDarkTheme: Boolean,
+    onThemeChange: (Boolean) -> Unit,
     viewModel: ProfileViewModel = hiltViewModel()
 ) {
     val context = LocalContext.current
-    val isDarkMode by viewModel.isDarkMode.collectAsState()
     val isPremium by viewModel.isPremiumUser.collectAsState()
     val storage by viewModel.storageDetails.collectAsState()
     val language by viewModel.selectedLanguage.collectAsState()
@@ -132,7 +133,7 @@ fun ProfileScreen(
                             fontSize = 16.sp
                         )
                         Text(
-                            text = if (isPremium) "All features unlocked • Ad-free" else "Tap Go Premium to unlock FHD downloads",
+                            text = if (isPremium) "All features unlocked - Ad-free" else "Tap Go Premium to unlock FHD downloads",
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             fontSize = 12.sp
                         )
@@ -322,8 +323,11 @@ fun ProfileScreen(
                                 Text(text = "Dark Theme", color = Color.White, fontSize = 14.sp)
                             }
                             Switch(
-                                checked = isDarkMode,
-                                onCheckedChange = { viewModel.toggleDarkMode(it) },
+                                checked = isDarkTheme,
+                                onCheckedChange = { enabled ->
+                                    viewModel.toggleDarkMode(enabled)
+                                    onThemeChange(enabled)
+                                },
                                 colors = SwitchDefaults.colors(
                                     checkedThumbColor = ElectricPurple,
                                     checkedTrackColor = ElectricPurple.copy(alpha = 0.4f)
@@ -338,7 +342,7 @@ fun ProfileScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clickable {
-                                    viewModel.setLanguage("Español")
+                                    viewModel.setLanguage("Spanish")
                                     Toast.makeText(context, "Language changed to Spanish!", Toast.LENGTH_SHORT).show()
                                 }
                                 .padding(horizontal = 16.dp, vertical = 16.dp),

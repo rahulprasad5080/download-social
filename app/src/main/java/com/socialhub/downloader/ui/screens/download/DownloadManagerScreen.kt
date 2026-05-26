@@ -190,7 +190,7 @@ fun DownloadManagerScreen(
                                                     overflow = TextOverflow.Ellipsis
                                                 )
                                                 Text(
-                                                    text = "${download.sizeLabel} • ${download.speedLabel}",
+                                                    text = "${download.sizeLabel} - ${download.speedLabel}",
                                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                                     fontSize = 11.sp
                                                 )
