@@ -8,6 +8,7 @@ import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
 import android.webkit.MimeTypeMap
+import com.socialhub.downloader.BuildConfig
 import com.socialhub.downloader.ui.components.SocialPlatform
 import com.socialhub.downloader.ui.screens.download.ActiveDownload
 import com.socialhub.downloader.ui.screens.download.CompletedDownload
@@ -126,15 +127,19 @@ class DownloadRepository @Inject constructor(
             )
             var lastError: Throwable? = null
 
-            for ((index, candidateUrl) in urlsToTry.withIndex()) {
+            for (candidateUrl in urlsToTry) {
                 try {
+                    val isProxy = candidateUrl.contains("/api/media/") ||
+                            (BuildConfig.SOCIAL_DOWNLOADER_BASE_URL.isNotBlank() &&
+                             candidateUrl.contains(BuildConfig.SOCIAL_DOWNLOADER_BASE_URL.substringAfter("://").substringBefore("/")))
+                    val headers = if (isProxy) emptyMap() else requestHeaders
                     return@runCatching downloadFromUrl(
                         sourceUrl = candidateUrl,
                         title = title,
                         extension = extension,
                         duration = duration,
                         downloadId = downloadId,
-                        requestHeaders = if (index == 0) emptyMap() else requestHeaders
+                        requestHeaders = headers
                     )
                 } catch (error: Throwable) {
                     lastError = error

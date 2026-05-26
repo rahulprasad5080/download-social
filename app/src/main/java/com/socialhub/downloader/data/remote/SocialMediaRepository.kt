@@ -19,12 +19,25 @@ class SocialMediaRepository @Inject constructor(
                 error("API config missing. Add socialDownloaderBaseUrl, socialDownloaderEndpoint and socialDownloaderToken in gradle.properties.")
             }
 
-            val response = apiService.resolveMedia(
-                VideoRequest(
-                    url = url,
-                    token = BuildConfig.SOCIAL_DOWNLOADER_TOKEN
+            val response = try {
+                apiService.resolveMedia(
+                    VideoRequest(
+                        url = url,
+                        token = BuildConfig.SOCIAL_DOWNLOADER_TOKEN
+                    )
                 )
-            )
+            } catch (e: java.net.SocketTimeoutException) {
+                error("Server is sleeping (Render free tier). Waking it up now, please try again in a few seconds...")
+            } catch (e: java.net.ConnectException) {
+                error("Server is sleeping (Render free tier). Waking it up now, please try again in a few seconds...")
+            } catch (e: java.io.IOException) {
+                val msg = e.message.orEmpty().lowercase()
+                if (msg.contains("timeout") || msg.contains("connect") || msg.contains("time out")) {
+                    error("Server is sleeping (Render free tier). Waking it up now, please try again in a few seconds...")
+                } else {
+                    throw e
+                }
+            }
 
             if (!response.isSuccessful) {
                 error(readApiError(response.errorBody()?.string(), response.code(), response.message()))
