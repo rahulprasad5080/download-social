@@ -1,7 +1,13 @@
 package com.socialhub.downloader.data
 
+import android.content.ContentValues
 import android.content.Context
+import android.media.MediaScannerConnection
+import android.net.Uri
+import android.os.Build
 import android.os.Environment
+import android.provider.MediaStore
+import android.webkit.MimeTypeMap
 import com.socialhub.downloader.ui.components.SocialPlatform
 import com.socialhub.downloader.ui.screens.download.ActiveDownload
 import com.socialhub.downloader.ui.screens.download.CompletedDownload
@@ -13,6 +19,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.io.OutputStream
 import java.net.HttpURLConnection
 import java.net.URL
 import javax.inject.Inject
@@ -121,15 +128,12 @@ class DownloadRepository @Inject constructor(
             }
 
             val totalBytes = connection.contentLengthLong.takeIf { it > 0L } ?: -1L
-            val outputFile = createOutputFile(title, extension)
+            val outputTarget = createOutputTarget(title, extension, contentType)
             var downloadedBytes = 0L
             val startedAt = System.currentTimeMillis()
 
-            // 4. Service stream ko file mein write karti hai:
-            // connection.inputStream.use { input -> outputFile.outputStream().use { output -> input.copyTo(output) } }
-            // Yahan manual loop use kiya hai taaki progress/speed Downloads tab mein update hoti rahe.
             connection.inputStream.use { input ->
-                outputFile.outputStream().use { output ->
+                outputTarget.outputStream.use { output ->
                     val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
                     while (true) {
                         val read = input.read(buffer)
@@ -156,31 +160,106 @@ class DownloadRepository @Inject constructor(
                     }
                 }
             }
+            finalizeOutputTarget(outputTarget, contentType)
 
             completeDownload(
                 id = downloadId,
                 duration = duration,
-                filePath = outputFile.absolutePath
+                filePath = outputTarget.displayPath
             )
-            outputFile.absolutePath
+            outputTarget.displayPath
         }.onFailure {
             cancelDownload(downloadId)
         }
     }
 
-    private fun createOutputFile(title: String, extension: String): File {
+    private fun createOutputTarget(title: String, extension: String, contentType: String): OutputTarget {
         val safeTitle = title
             .replace(Regex("[^A-Za-z0-9._ -]"), "_")
             .trim()
             .ifBlank { "download_${System.currentTimeMillis()}" }
-        val directory = File(context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), "SocialHub")
+        val cleanExtension = extension.trim().ifBlank { ".mp4" }.let {
+            if (it.startsWith(".")) it else ".$it"
+        }
+        val fileName = "$safeTitle$cleanExtension"
+        val mimeType = resolveMimeType(cleanExtension, contentType)
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val values = ContentValues().apply {
+                put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
+                put(MediaStore.MediaColumns.MIME_TYPE, mimeType)
+                put(MediaStore.MediaColumns.RELATIVE_PATH, "${Environment.DIRECTORY_DOWNLOADS}/SocialHub")
+                put(MediaStore.MediaColumns.IS_PENDING, 1)
+            }
+            val uri = context.contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
+                ?: error("Unable to create media file")
+            val outputStream = context.contentResolver.openOutputStream(uri)
+                ?: error("Unable to open media file")
+
+            return OutputTarget(
+                displayPath = uri.toString(),
+                uri = uri,
+                file = null,
+                outputStream = outputStream
+            )
+        }
+
+        val directory = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "SocialHub")
         directory.mkdirs()
-        return File(directory, "$safeTitle$extension")
+        val file = File(directory, fileName)
+        return OutputTarget(
+            displayPath = file.absolutePath,
+            uri = Uri.fromFile(file),
+            file = file,
+            outputStream = file.outputStream()
+        )
+    }
+
+    private fun finalizeOutputTarget(target: OutputTarget, contentType: String) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && target.uri != null) {
+            val values = ContentValues().apply {
+                put(MediaStore.MediaColumns.IS_PENDING, 0)
+            }
+            context.contentResolver.update(target.uri, values, null, null)
+        } else {
+            target.file?.let { file ->
+                MediaScannerConnection.scanFile(
+                    context,
+                    arrayOf(file.absolutePath),
+                    arrayOf(contentType.takeIf { it.contains("/") } ?: "video/mp4"),
+                    null
+                )
+            }
+        }
+    }
+
+    private fun resolveMimeType(extension: String, contentType: String): String {
+        val cleanContentType = contentType.substringBefore(";").trim()
+        if (cleanContentType.contains("/") &&
+            !cleanContentType.equals("application/octet-stream", ignoreCase = true)
+        ) {
+            return cleanContentType
+        }
+
+        val extensionWithoutDot = extension.removePrefix(".").lowercase()
+        return MimeTypeMap.getSingleton().getMimeTypeFromExtension(extensionWithoutDot)
+            ?: if (extensionWithoutDot in audioExtensions) "audio/$extensionWithoutDot" else "video/$extensionWithoutDot"
     }
 
     private fun Long.formatBytes(): String {
         val kb = this / 1024.0
         val mb = kb / 1024.0
         return if (mb >= 1) String.format("%.1f MB", mb) else String.format("%.1f KB", kb)
+    }
+
+    private data class OutputTarget(
+        val displayPath: String,
+        val uri: Uri?,
+        val file: File?,
+        val outputStream: OutputStream
+    )
+
+    private companion object {
+        val audioExtensions = setOf("mp3", "m4a", "aac", "wav", "ogg", "opus")
     }
 }

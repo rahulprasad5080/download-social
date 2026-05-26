@@ -72,7 +72,7 @@ fun DownloadManagerScreen(
             TopAppBar(
                 title = { Text("Downloads", color = Color.White) },
                 actions = {
-                    IconButton(onClick = { Toast.makeText(context, "Storage path: /Movies/SocialHub", Toast.LENGTH_SHORT).show() }) {
+                    IconButton(onClick = { Toast.makeText(context, "Storage path: Downloads/SocialHub", Toast.LENGTH_SHORT).show() }) {
                         Icon(imageVector = Icons.Default.FolderOpen, contentDescription = "Storage Folder", tint = Color.White)
                     }
                 },

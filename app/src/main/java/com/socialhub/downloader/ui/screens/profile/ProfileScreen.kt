@@ -292,7 +292,7 @@ fun ProfileScreen(
                                 Text(text = "Download Directory", color = Color.White, fontSize = 14.sp)
                             }
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(text = "/Movies/SocialHub", color = Color.Gray, fontSize = 11.sp)
+                                Text(text = "Downloads/SocialHub", color = Color.Gray, fontSize = 11.sp)
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Icon(imageVector = Icons.Default.ChevronRight, contentDescription = null, tint = Color.Gray, modifier = Modifier.size(16.dp))
                             }
