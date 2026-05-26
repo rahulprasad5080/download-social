@@ -1,10 +1,14 @@
 package com.socialhub.downloader.ui.screens.preview
 
+import android.content.Context
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.socialhub.downloader.download.DownloadService
 import com.socialhub.downloader.ui.components.DownloadButtonState
 import com.socialhub.downloader.ui.components.SocialPlatform
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -13,6 +17,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
+import java.net.HttpURLConnection
 import java.net.URL
 import javax.inject.Inject
 
@@ -24,6 +29,7 @@ enum class SelectedQuality(val label: String, val size: String, val extension: S
 }
 
 data class VideoDetails(
+    val sourceUrl: String,
     val title: String,
     val platform: SocialPlatform,
     val duration: String,
@@ -35,7 +41,9 @@ data class VideoDetails(
 )
 
 @HiltViewModel
-class VideoPreviewViewModel @Inject constructor() : ViewModel() {
+class VideoPreviewViewModel @Inject constructor(
+    @ApplicationContext private val context: Context
+) : ViewModel() {
 
     private val _isLoading = MutableStateFlow(true)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
@@ -131,6 +139,7 @@ class VideoPreviewViewModel @Inject constructor() : ViewModel() {
         }
 
         return VideoDetails(
+            sourceUrl = url,
             title = title,
             platform = platform,
             duration = when (platform) {
@@ -178,12 +187,67 @@ class VideoPreviewViewModel @Inject constructor() : ViewModel() {
 
     fun startDownload(onDownloadCompleted: (String, SelectedQuality) -> Unit) {
         viewModelScope.launch {
+            // 1. User ne jo URL paste kiya tha, woh details.sourceUrl mein available hai.
+            val details = _videoDetails.value ?: return@launch
             _downloadMessage.value = null
 
-            _downloadState.value = DownloadButtonState.ERROR
-            _downloadMessage.value = "Download service is not connected yet. No file was saved."
-            delay(1600)
+            // 2. App pehle HEAD/content-type se check karta hai ki link direct video/audio file hai ya nahi.
+            if (!isDirectDownloadUrl(details.sourceUrl)) {
+                _downloadState.value = DownloadButtonState.ERROR
+                _downloadMessage.value = "This link is a web page. Use a direct video/audio file link."
+                delay(1600)
+                _downloadState.value = DownloadButtonState.IDLE
+                return@launch
+            }
+
+            // 3. Direct media URL milne par foreground DownloadService start hoti hai.
+            ContextCompat.startForegroundService(
+                context,
+                DownloadService.createIntent(
+                    context = context,
+                    url = details.sourceUrl,
+                    title = details.title,
+                    platform = details.platform,
+                    sizeLabel = _selectedQuality.value.size,
+                    duration = details.duration,
+                    extension = _selectedQuality.value.extension
+                )
+            )
+            _downloadState.value = DownloadButtonState.COMPLETED
+            _downloadMessage.value = "Download started"
+            delay(1000)
             _downloadState.value = DownloadButtonState.IDLE
+            onDownloadCompleted(details.title, _selectedQuality.value)
         }
+    }
+
+    private suspend fun isDirectDownloadUrl(url: String): Boolean = withContext(Dispatchers.IO) {
+        val lowerUrl = url.substringBefore('?').lowercase()
+        if (lowerUrl.endsWith(".mp4") ||
+            lowerUrl.endsWith(".mp3") ||
+            lowerUrl.endsWith(".m4a") ||
+            lowerUrl.endsWith(".webm") ||
+            lowerUrl.endsWith(".mov")
+        ) {
+            return@withContext true
+        }
+
+        runCatching {
+            // Same idea as: val connection = URL(inputUrl).openConnection() as HttpURLConnection
+            // Then requestMethod = "HEAD" and contentType startsWith("video/") or "audio/".
+            val connection = (URL(url).openConnection() as HttpURLConnection).apply {
+                requestMethod = "HEAD"
+                instanceFollowRedirects = true
+                connectTimeout = 8000
+                readTimeout = 8000
+                setRequestProperty("User-Agent", "SocialHubDownloader/1.0")
+            }
+            connection.connect()
+            val contentType = connection.contentType.orEmpty().lowercase()
+            connection.disconnect()
+            contentType.startsWith("video/") ||
+                contentType.startsWith("audio/") ||
+                contentType == "application/octet-stream"
+        }.getOrDefault(false)
     }
 }

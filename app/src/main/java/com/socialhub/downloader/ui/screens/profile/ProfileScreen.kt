@@ -1,7 +1,6 @@
 package com.socialhub.downloader.ui.screens.profile
 
 import android.widget.Toast
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -23,12 +22,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.CleaningServices
-import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.FolderSpecial
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Share
-import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.SupportAgent
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -36,8 +32,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -65,12 +59,9 @@ import com.socialhub.downloader.ui.theme.NeonPink
 @Composable
 fun ProfileScreen(
     navController: NavController,
-    isDarkTheme: Boolean,
-    onThemeChange: (Boolean) -> Unit,
     viewModel: ProfileViewModel = hiltViewModel()
 ) {
     val context = LocalContext.current
-    val isPremium by viewModel.isPremiumUser.collectAsState()
     val storage by viewModel.storageDetails.collectAsState()
     val language by viewModel.selectedLanguage.collectAsState()
 
@@ -103,8 +94,7 @@ fun ProfileScreen(
                             .clip(CircleShape)
                             .background(
                                 brush = Brush.sweepGradient(
-                                    colors = if (isPremium) listOf(NeonPink, ElectricPurple, NeonPink)
-                                    else listOf(Color.Gray, Color.DarkGray, Color.Gray)
+                                    colors = listOf(Color.Gray, Color.DarkGray, Color.Gray)
                                 )
                             )
                             .padding(3.dp)
@@ -119,7 +109,7 @@ fun ProfileScreen(
                             Icon(
                                 imageVector = Icons.Default.Person,
                                 contentDescription = "Avatar",
-                                tint = if (isPremium) NeonPink else Color.Gray,
+                                tint = Color.Gray,
                                 modifier = Modifier.size(36.dp)
                             )
                         }
@@ -127,13 +117,13 @@ fun ProfileScreen(
                     Spacer(modifier = Modifier.width(16.dp))
                     Column {
                         Text(
-                            text = if (isPremium) "SocialHub Premium Member" else "SocialHub Guest User",
+                            text = "SocialHub User",
                             color = Color.White,
                             fontWeight = FontWeight.Bold,
                             fontSize = 16.sp
                         )
                         Text(
-                            text = if (isPremium) "All features unlocked - Ad-free" else "Tap Go Premium to unlock FHD downloads",
+                            text = "Manage downloads and app storage",
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             fontSize = 12.sp
                         )
@@ -243,56 +233,6 @@ fun ProfileScreen(
                 }
             }
 
-            // Go Premium Card (Only if not premium)
-            item {
-                AnimatedVisibility(visible = !isPremium) {
-                    Column {
-                        Spacer(modifier = Modifier.height(16.dp))
-                        GlassCard(
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .background(
-                                        brush = Brush.horizontalGradient(
-                                            listOf(NeonPink.copy(alpha = 0.2f), ElectricPurple.copy(alpha = 0.2f))
-                                        )
-                                    )
-                                    .padding(16.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(imageVector = Icons.Default.Star, contentDescription = null, tint = NeonPink, modifier = Modifier.size(20.dp))
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                        Text(text = "Unlock Premium", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                                    }
-                                    Text(
-                                        text = "Download in full resolution, stream without video ads, and get unlimited speed.",
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        fontSize = 11.sp,
-                                        lineHeight = 16.sp
-                                    )
-                                }
-                                Spacer(modifier = Modifier.width(12.dp))
-                                Button(
-                                    onClick = {
-                                        viewModel.unlockPremium()
-                                        Toast.makeText(context, "Premium unlocked successfully!", Toast.LENGTH_LONG).show()
-                                    },
-                                    colors = ButtonDefaults.buttonColors(containerColor = NeonPink),
-                                    shape = RoundedCornerShape(20.dp)
-                                ) {
-                                    Text(text = "Go Pro", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
             // General Settings Cards Group
             item {
                 Spacer(modifier = Modifier.height(20.dp))
@@ -308,34 +248,6 @@ fun ProfileScreen(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    // Dark Theme Row
-                    GlassCard(modifier = Modifier.fillMaxWidth()) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(imageVector = Icons.Default.DarkMode, contentDescription = null, tint = ElectricPurple, modifier = Modifier.size(20.dp))
-                                Spacer(modifier = Modifier.width(12.dp))
-                                Text(text = "Dark Theme", color = Color.White, fontSize = 14.sp)
-                            }
-                            Switch(
-                                checked = isDarkTheme,
-                                onCheckedChange = { enabled ->
-                                    viewModel.toggleDarkMode(enabled)
-                                    onThemeChange(enabled)
-                                },
-                                colors = SwitchDefaults.colors(
-                                    checkedThumbColor = ElectricPurple,
-                                    checkedTrackColor = ElectricPurple.copy(alpha = 0.4f)
-                                )
-                            )
-                        }
-                    }
-
                     // Language Row
                     GlassCard(modifier = Modifier.fillMaxWidth()) {
                         Row(
@@ -389,7 +301,7 @@ fun ProfileScreen(
                 }
             }
 
-            // Share & Support settings
+            // Support settings
             item {
                 Spacer(modifier = Modifier.height(16.dp))
                 Column(
@@ -413,22 +325,6 @@ fun ProfileScreen(
                         }
                     }
 
-                    // Share row
-                    GlassCard(modifier = Modifier.fillMaxWidth()) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    Toast.makeText(context, "Opening platform share manager", Toast.LENGTH_SHORT).show()
-                                }
-                                .padding(horizontal = 16.dp, vertical = 16.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(imageVector = Icons.Default.Share, contentDescription = null, tint = CyberCyan, modifier = Modifier.size(20.dp))
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Text(text = "Share SocialHub with Friends", color = Color.White, fontSize = 14.sp)
-                        }
-                    }
                 }
             }
         }

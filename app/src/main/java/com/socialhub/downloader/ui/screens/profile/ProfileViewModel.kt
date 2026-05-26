@@ -30,14 +30,8 @@ class ProfileViewModel @Inject constructor(
     private val downloadRepository: DownloadRepository
 ) : ViewModel() {
 
-    private val _isDarkMode = MutableStateFlow(true)
-    val isDarkMode: StateFlow<Boolean> = _isDarkMode.asStateFlow()
-
     private val _selectedLanguage = MutableStateFlow("English")
     val selectedLanguage: StateFlow<String> = _selectedLanguage.asStateFlow()
-
-    private val _isPremiumUser = MutableStateFlow(false)
-    val isPremiumUser: StateFlow<Boolean> = _isPremiumUser.asStateFlow()
 
     private val _storageDetails = MutableStateFlow(emptyStorageDetails())
     val storageDetails: StateFlow<StorageDetails> = _storageDetails.asStateFlow()
@@ -51,16 +45,8 @@ class ProfileViewModel @Inject constructor(
         }
     }
 
-    fun toggleDarkMode(enabled: Boolean) {
-        _isDarkMode.value = enabled
-    }
-
     fun setLanguage(lang: String) {
         _selectedLanguage.value = lang
-    }
-
-    fun unlockPremium() {
-        _isPremiumUser.value = true
     }
 
     fun clearCache() {

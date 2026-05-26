@@ -32,9 +32,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
@@ -63,17 +60,12 @@ class MainActivity : ComponentActivity() {
         WindowCompat.setDecorFitsSystemWindows(window, false)
 
         setContent {
-            var isDarkTheme by remember { mutableStateOf(true) }
-            
-            SocialHubTheme(darkTheme = isDarkTheme) {
+            SocialHubTheme(darkTheme = true) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    MainAppShell(
-                        isDarkTheme = isDarkTheme,
-                        onThemeChange = { isDarkTheme = it }
-                    )
+                    MainAppShell()
                 }
             }
         }
@@ -81,10 +73,7 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun MainAppShell(
-    isDarkTheme: Boolean,
-    onThemeChange: (Boolean) -> Unit
-) {
+fun MainAppShell() {
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
@@ -127,9 +116,7 @@ fun MainAppShell(
             color = MaterialTheme.colorScheme.background
         ) {
             NavGraph(
-                navController = navController,
-                isDarkTheme = isDarkTheme,
-                onThemeChange = onThemeChange
+                navController = navController
             )
         }
     }
