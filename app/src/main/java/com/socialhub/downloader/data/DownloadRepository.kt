@@ -110,79 +110,120 @@ class DownloadRepository @Inject constructor(
 
     suspend fun downloadDirectMedia(
         sourceUrl: String,
+        fallbackUrl: String?,
         title: String,
         platform: SocialPlatform,
         requestedSizeLabel: String,
         duration: String,
-        extension: String
+        extension: String,
+        requestHeaders: Map<String, String> = emptyMap()
     ): Result<String> = withContext(Dispatchers.IO) {
         val downloadId = startDownload(title, platform, requestedSizeLabel)
         runCatching {
-            val connection = (URL(sourceUrl).openConnection() as HttpURLConnection).apply {
-                instanceFollowRedirects = true
-                connectTimeout = 15000
-                readTimeout = 30000
-                setRequestProperty("User-Agent", "SocialHubDownloader/1.0")
-            }
+            val urlsToTry = listOfNotNull(
+                sourceUrl.takeIf { it.isNotBlank() },
+                fallbackUrl?.takeIf { it.isNotBlank() && it != sourceUrl }
+            )
+            var lastError: Throwable? = null
 
-            connection.connect()
-            val contentType = connection.contentType.orEmpty()
-            if (connection.responseCode !in 200..299) {
-                error("Server returned ${connection.responseCode}")
-            }
-            if (contentType.contains("text/html", ignoreCase = true)) {
-                error("This link is a web page, not a direct media file")
-            }
-
-            val totalBytes = connection.contentLengthLong.takeIf { it > 0L } ?: -1L
-            val outputTarget = createOutputTarget(title, extension, contentType)
-            var downloadedBytes = 0L
-            val startedAt = System.currentTimeMillis()
-
-            connection.inputStream.use { input ->
-                outputTarget.outputStream.use { output ->
-                    val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
-                    while (true) {
-                        val read = input.read(buffer)
-                        if (read == -1) break
-
-                        output.write(buffer, 0, read)
-                        downloadedBytes += read
-
-                        val elapsedSeconds = ((System.currentTimeMillis() - startedAt).coerceAtLeast(1L)) / 1000.0
-                        val bytesPerSecond = (downloadedBytes / elapsedSeconds).toLong()
-                        val progress = if (totalBytes > 0L) downloadedBytes.toFloat() / totalBytes else 0f
-                        val remainingTime = if (totalBytes > 0L && bytesPerSecond > 0L) {
-                            "${((totalBytes - downloadedBytes) / bytesPerSecond).coerceAtLeast(1L)}s"
-                        } else {
-                            "Calculating"
-                        }
-
-                        updateProgress(
-                            id = downloadId,
-                            progress = progress,
-                            speedLabel = "${bytesPerSecond.formatBytes()}/s",
-                            remainingTime = remainingTime
-                        )
-                    }
+            for ((index, candidateUrl) in urlsToTry.withIndex()) {
+                try {
+                    return@runCatching downloadFromUrl(
+                        sourceUrl = candidateUrl,
+                        title = title,
+                        extension = extension,
+                        duration = duration,
+                        downloadId = downloadId,
+                        requestHeaders = if (index == 0) emptyMap() else requestHeaders
+                    )
+                } catch (error: Throwable) {
+                    lastError = error
                 }
             }
-            finalizeOutputTarget(outputTarget, contentType)
 
-            completeDownload(
-                id = downloadId,
-                duration = duration,
-                filePath = outputTarget.displayPath
-            )
-            outputTarget.displayPath
+            throw lastError ?: IllegalStateException("No download URL available")
         }.onFailure {
             cancelDownload(downloadId)
         }
     }
 
+    private fun downloadFromUrl(
+        sourceUrl: String,
+        title: String,
+        extension: String,
+        duration: String,
+        downloadId: String,
+        requestHeaders: Map<String, String>
+    ): String {
+        val connection = (URL(sourceUrl).openConnection() as HttpURLConnection).apply {
+            instanceFollowRedirects = true
+            connectTimeout = CONNECT_TIMEOUT_MS
+            readTimeout = READ_TIMEOUT_MS
+            setRequestProperty("User-Agent", "SocialHubDownloader/1.0")
+            requestHeaders.forEach { (key, value) ->
+                if (key.isNotBlank() && value.isNotBlank() && !key.equals("Host", ignoreCase = true)) {
+                    setRequestProperty(key, value)
+                }
+            }
+        }
+
+        connection.connect()
+        val contentType = connection.contentType.orEmpty()
+        if (connection.responseCode !in 200..299) {
+            error("Server returned ${connection.responseCode}")
+        }
+        if (contentType.contains("text/html", ignoreCase = true)) {
+            error("This link is a web page, not a direct media file")
+        }
+
+        val totalBytes = connection.contentLengthLong.takeIf { it > 0L } ?: -1L
+        val outputTarget = createOutputTarget(title, extension, contentType)
+        var downloadedBytes = 0L
+        val startedAt = System.currentTimeMillis()
+
+        connection.inputStream.use { input ->
+            outputTarget.outputStream.use { output ->
+                val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+                while (true) {
+                    val read = input.read(buffer)
+                    if (read == -1) break
+
+                    output.write(buffer, 0, read)
+                    downloadedBytes += read
+
+                    val elapsedSeconds = ((System.currentTimeMillis() - startedAt).coerceAtLeast(1L)) / 1000.0
+                    val bytesPerSecond = (downloadedBytes / elapsedSeconds).toLong()
+                    val progress = if (totalBytes > 0L) downloadedBytes.toFloat() / totalBytes else 0f
+                    val remainingTime = if (totalBytes > 0L && bytesPerSecond > 0L) {
+                        "${((totalBytes - downloadedBytes) / bytesPerSecond).coerceAtLeast(1L)}s"
+                    } else {
+                        "Calculating"
+                    }
+
+                    updateProgress(
+                        id = downloadId,
+                        progress = progress,
+                        speedLabel = "${bytesPerSecond.formatBytes()}/s",
+                        remainingTime = remainingTime
+                    )
+                }
+            }
+        }
+        finalizeOutputTarget(outputTarget, contentType)
+
+        completeDownload(
+            id = downloadId,
+            duration = duration,
+            filePath = outputTarget.displayPath
+        )
+        return outputTarget.displayPath
+    }
+
     private fun createOutputTarget(title: String, extension: String, contentType: String): OutputTarget {
         val safeTitle = title
             .replace(Regex("[^A-Za-z0-9._ -]"), "_")
+            .trim()
+            .take(MAX_FILENAME_STEM_LENGTH)
             .trim()
             .ifBlank { "download_${System.currentTimeMillis()}" }
         val cleanExtension = extension.trim().ifBlank { ".mp4" }.let {
@@ -282,6 +323,9 @@ class DownloadRepository @Inject constructor(
 
     private companion object {
         const val COMPLETED_DOWNLOADS_KEY = "completed_downloads"
+        const val CONNECT_TIMEOUT_MS = 30000
+        const val READ_TIMEOUT_MS = 180000
+        const val MAX_FILENAME_STEM_LENGTH = 80
         val audioExtensions = setOf("mp3", "m4a", "aac", "wav", "ogg", "opus")
     }
 }

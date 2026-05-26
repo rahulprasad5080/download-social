@@ -61,6 +61,7 @@ class VideoPreviewViewModel @Inject constructor(
 
     private val _downloadMessage = MutableStateFlow<String?>(null)
     val downloadMessage: StateFlow<String?> = _downloadMessage.asStateFlow()
+    private var lastResolveError: String? = null
 
     fun loadVideoDetails(url: String) {
         viewModelScope.launch {
@@ -70,9 +71,14 @@ class VideoPreviewViewModel @Inject constructor(
             val platform = detectPlatform(url)
             val resolved = socialMediaRepository.resolve(url)
             val details = resolved.fold(
-                onSuccess = { media -> media.toVideoDetails(url, platform) },
+                onSuccess = { media ->
+                    lastResolveError = null
+                    media.toVideoDetails(url, platform)
+                },
                 onFailure = { error ->
-                    _downloadMessage.value = error.message ?: "Unable to resolve this link"
+                    val message = error.message ?: "Unable to resolve this link"
+                    lastResolveError = message
+                    _downloadMessage.value = message
                     createFallbackDetails(url, platform)
                 }
             )
@@ -162,6 +168,8 @@ class VideoPreviewViewModel @Inject constructor(
             sizeLabel = "Unknown size",
             extension = ".$extension",
             downloadUrl = url,
+            originalUrl = url,
+            requestHeaders = emptyMap(),
             hasVideo = hasVideo,
             hasAudio = true
         )
@@ -220,7 +228,7 @@ class VideoPreviewViewModel @Inject constructor(
 
             if (option == null) {
                 _downloadState.value = DownloadButtonState.ERROR
-                _downloadMessage.value = "No downloadable media found. Check API configuration."
+                _downloadMessage.value = lastResolveError ?: "No downloadable media found. Check API configuration."
                 delay(1600)
                 _downloadState.value = DownloadButtonState.IDLE
                 return@launch
@@ -231,11 +239,13 @@ class VideoPreviewViewModel @Inject constructor(
                 DownloadService.createIntent(
                     context = context,
                     url = option.downloadUrl,
+                    fallbackUrl = option.originalUrl,
                     title = details.title,
                     platform = details.platform,
                     sizeLabel = option.sizeLabel,
                     duration = details.duration,
-                    extension = option.extension
+                    extension = option.extension,
+                    requestHeaders = option.requestHeaders
                 )
             )
             _downloadState.value = DownloadButtonState.COMPLETED

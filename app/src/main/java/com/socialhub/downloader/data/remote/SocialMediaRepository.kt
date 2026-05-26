@@ -3,6 +3,7 @@ package com.socialhub.downloader.data.remote
 import com.socialhub.downloader.BuildConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.json.JSONObject
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -26,7 +27,7 @@ class SocialMediaRepository @Inject constructor(
             )
 
             if (!response.isSuccessful) {
-                error("API failed: ${response.code()} ${response.message()}")
+                error(readApiError(response.errorBody()?.string(), response.code(), response.message()))
             }
 
             val body = response.body() ?: error("API response is empty")
@@ -68,13 +69,27 @@ class SocialMediaRepository @Inject constructor(
                 ?: size?.formatBytes()
                 ?: "Unknown size",
             extension = ".$cleanExtension",
-            downloadUrl = requireNotNull(url),
+            downloadUrl = proxyUrl?.takeIf { it.isNotBlank() } ?: requireNotNull(url),
+            originalUrl = url,
+            requestHeaders = headers.orEmpty()
+                .filterKeys { key -> key.isNotBlank() }
+                .filterValues { value -> value.isNotBlank() },
             hasVideo = hasVideo,
             hasAudio = hasAudio
         )
     }
 
-    private fun Int.formatBytes(): String {
+    private fun readApiError(errorBody: String?, code: Int, fallbackMessage: String): String {
+        val backendMessage = runCatching {
+            JSONObject(errorBody.orEmpty()).optString("error")
+        }.getOrDefault("")
+
+        return backendMessage
+            .takeIf { it.isNotBlank() }
+            ?: "API failed: $code $fallbackMessage"
+    }
+
+    private fun Long.formatBytes(): String {
         val kb = this / 1024.0
         val mb = kb / 1024.0
         return if (mb >= 1) String.format("%.1f MB", mb) else String.format("%.1f KB", kb)

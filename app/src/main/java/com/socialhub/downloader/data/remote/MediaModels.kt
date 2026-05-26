@@ -17,15 +17,17 @@ data class VideoResponse(
 
 data class Media(
     val url: String? = null,
+    val proxyUrl: String? = null,
     val quality: String? = null,
     val extension: String? = null,
-    val size: Int? = null,
+    val size: Long? = null,
     val formattedSize: String? = null,
     val videoAvailable: Boolean? = null,
     val audioAvailable: Boolean? = null,
     val chunked: Boolean? = null,
     val cached: Boolean? = null,
-    val requiresRendering: Boolean? = null
+    val requiresRendering: Boolean? = null,
+    val headers: Map<String, String>? = null
 )
 
 data class DownloadOption(
@@ -33,6 +35,8 @@ data class DownloadOption(
     val sizeLabel: String,
     val extension: String,
     val downloadUrl: String,
+    val originalUrl: String?,
+    val requestHeaders: Map<String, String>,
     val hasVideo: Boolean,
     val hasAudio: Boolean
 )
