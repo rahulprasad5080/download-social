@@ -12,6 +12,8 @@ import com.socialhub.downloader.ui.components.SocialPlatform
 import com.socialhub.downloader.ui.screens.download.ActiveDownload
 import com.socialhub.downloader.ui.screens.download.CompletedDownload
 import com.socialhub.downloader.ui.screens.download.DownloadStatus
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -32,7 +34,10 @@ class DownloadRepository @Inject constructor(
     private val _activeDownloads = MutableStateFlow<List<ActiveDownload>>(emptyList())
     val activeDownloads: StateFlow<List<ActiveDownload>> = _activeDownloads.asStateFlow()
 
-    private val _completedDownloads = MutableStateFlow<List<CompletedDownload>>(emptyList())
+    private val gson = Gson()
+    private val preferences = context.getSharedPreferences("downloads", Context.MODE_PRIVATE)
+
+    private val _completedDownloads = MutableStateFlow(loadCompletedDownloads())
     val completedDownloads: StateFlow<List<CompletedDownload>> = _completedDownloads.asStateFlow()
 
     fun startDownload(title: String, platform: SocialPlatform, sizeLabel: String): String {
@@ -79,6 +84,7 @@ class DownloadRepository @Inject constructor(
                 createdAtMillis = System.currentTimeMillis()
             )
         ) + _completedDownloads.value
+        persistCompletedDownloads()
     }
 
     fun pauseDownload(id: String) {
@@ -99,6 +105,7 @@ class DownloadRepository @Inject constructor(
 
     fun deleteCompleted(id: String) {
         _completedDownloads.value = _completedDownloads.value.filterNot { it.id == id }
+        persistCompletedDownloads()
     }
 
     suspend fun downloadDirectMedia(
@@ -252,6 +259,20 @@ class DownloadRepository @Inject constructor(
         return if (mb >= 1) String.format("%.1f MB", mb) else String.format("%.1f KB", kb)
     }
 
+    private fun loadCompletedDownloads(): List<CompletedDownload> {
+        val json = preferences.getString(COMPLETED_DOWNLOADS_KEY, null) ?: return emptyList()
+        return runCatching {
+            val type = object : TypeToken<List<CompletedDownload>>() {}.type
+            gson.fromJson<List<CompletedDownload>>(json, type).orEmpty()
+        }.getOrDefault(emptyList())
+    }
+
+    private fun persistCompletedDownloads() {
+        preferences.edit()
+            .putString(COMPLETED_DOWNLOADS_KEY, gson.toJson(_completedDownloads.value))
+            .apply()
+    }
+
     private data class OutputTarget(
         val displayPath: String,
         val uri: Uri?,
@@ -260,6 +281,7 @@ class DownloadRepository @Inject constructor(
     )
 
     private companion object {
+        const val COMPLETED_DOWNLOADS_KEY = "completed_downloads"
         val audioExtensions = setOf("mp3", "m4a", "aac", "wav", "ogg", "opus")
     }
 }
